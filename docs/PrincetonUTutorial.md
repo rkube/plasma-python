@@ -130,7 +130,8 @@ Preprocessing must be performed only once per each dataset. For example, conside
 paths:
     data: jet_0D
 ```    
-Preprocessing this dataset takes about 20 minutes to preprocess in parallel and can normally be done on the cluster headnode.
+Preprocessing this dataset takes about 20 minutes to preprocess in parallel and results in heavy load across all CPUs.
+It should therefore be done on a compute node and not on the cluster head node.
 
 ### Current signals and notations
 
