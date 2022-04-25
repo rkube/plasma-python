@@ -16,7 +16,8 @@ import sys
 import os
 
 import numpy as np
-import pathos.multiprocessing as mp
+#import pathos.multiprocessing as mp
+import multiprocessing as mp
 
 from plasma.utils.processing import append_to_filename
 from plasma.utils.diagnostics import print_shot_list_sizes
@@ -87,7 +88,12 @@ class Preprocessor(object):
         # TODO(KGF): generalize the follwowing line to perform well on
         # architecutres other than CPUs, e.g. KNLs
         # min( <desired-maximum-process-count>, max(1,mp.cpu_count()-2) )
-        use_cores = max(1, mp.cpu_count() - 2)
+        # Adjust number of threads to use for pre-processing.
+        # Limits between 1 and mp.cpu_count() - 2
+        if conf["max_cpus"] == -1:
+            use_cores = max(1, mp.cpu_count() - 2)
+        else:
+            use_cores = min(conf["max_cpus"], mp.cpu_count() - 2)
         pool = mp.Pool(use_cores)
         print('Running in parallel on {} processes'.format(pool._processes))
         start_time = time.time()

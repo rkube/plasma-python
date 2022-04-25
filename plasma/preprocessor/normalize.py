@@ -17,7 +17,8 @@ import abc
 
 import numpy as np
 from scipy.signal import exponential, correlate
-import pathos.multiprocessing as mp
+#import pathos.multiprocessing as mp
+import multiprocessing as mp
 
 from plasma.primitives.shots import ShotList, Shot
 
@@ -128,6 +129,12 @@ class Normalizer(object):
                 self.load_stats(verbose=True)
             print('computing normalization for machines {}'.format(
                 machines_to_compute))
+            # Adjust number of threads to use for pre-processing.
+            # Limits between 1 and mp.cpu_count() - 2
+            if conf["max_cpus"] == -1:
+                use_cores = max(1, mp.cpu_count() - 2)
+            else:
+                use_cores = min(conf["max_cpus"], mp.cpu_count() - 2)
             use_cores = max(1, mp.cpu_count()-2)
             pool = mp.Pool(use_cores)
             print('running in parallel on {} processes'.format(
