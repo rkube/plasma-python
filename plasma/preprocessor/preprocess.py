@@ -16,8 +16,7 @@ import sys
 import os
 
 import numpy as np
-#import pathos.multiprocessing as mp
-import multiprocessing as mp
+import pathos.multiprocessing as mp
 
 from plasma.utils.processing import append_to_filename
 from plasma.utils.diagnostics import print_shot_list_sizes
