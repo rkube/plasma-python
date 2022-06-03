@@ -9,7 +9,7 @@ This work was supported by the DOE CSGF program.
 '''
 
 from __future__ import print_function
-import plasma.global_vars as g
+import global_vars as g
 import os
 import time
 import sys
@@ -17,7 +17,7 @@ import abc
 
 import numpy as np
 from scipy.signal import exponential, correlate
-import pathos.multiprocessing as mp
+import multiprocessing as mp
 
 from plasma.primitives.shots import ShotList, Shot
 
@@ -128,12 +128,7 @@ class Normalizer(object):
                 self.load_stats(verbose=True)
             print('computing normalization for machines {}'.format(
                 machines_to_compute))
-            # Adjust number of threads to use for pre-processing.
-            # Limits between 1 and mp.cpu_count() - 2
-            if conf["max_cpus"] == -1:
-                use_cores = max(1, mp.cpu_count() - 2)
-            else:
-                use_cores = min(conf["max_cpus"], mp.cpu_count() - 2)
+            use_cores = max(1, mp.cpu_count()-2)
             pool = mp.Pool(use_cores)
             print('running in parallel on {} processes'.format(
                 pool._processes))
@@ -249,7 +244,7 @@ class MeanVarNormalizer(Normalizer):
                                     (1, num_signals))
             stats.is_disruptive = shot.is_disruptive
         else:
-            print('Warning: shot {} not valid [omit]'.format(shot.number))
+            print('Warning: shot {} not valid, omitting'.format(shot.number))
         stats.valid = shot.valid
         stats.machine = shot.machine
         return stats
@@ -337,6 +332,27 @@ class VarNormalizer(MeanVarNormalizer):
                     shot.signals_dict[sig], -self.bound, self.bound)
         shot.ttd = self.remapper(shot.ttd, self.conf['data']['T_warning'])
         self.cut_end_of_shot(shot)
+    
+    def applyandprint(self, shot):
+        apply_positivity(shot)
+        assert self.means is not None and self.stds is not None, (
+            "self.means or self.stds not initialized")
+        m = shot.machine
+        stds = np.median(self.stds[m], axis=0)
+        for (i, sig) in enumerate(shot.signals):
+            print("***=============******************* Applying normalization!!!")
+            print("***=============******************* Applying normalization!!!")
+            print("***=============******************* Applying normalization!!!")
+            if sig.normalize:
+                stds_curr = stds[i]
+                if stds_curr == 0.0:
+                    stds_curr = 1.0
+                shot.signals_dict[sig] = (shot.signals_dict[sig])/stds_curr
+                print(sig.description,sig.normalize,stds_curr,self.bound)
+                shot.signals_dict[sig] = np.clip(
+                    shot.signals_dict[sig], -self.bound, self.bound)
+        shot.ttd = self.remapper(shot.ttd, self.conf['data']['T_warning'])
+        self.cut_end_of_shot(shot)
 
     def __str__(self):
         s = ''
@@ -402,7 +418,7 @@ class MinMaxNormalizer(Normalizer):
             stats.maximums = np.array([np.max(sig) for sig in list_of_signals])
             stats.is_disruptive = shot.is_disruptive
         else:
-            print('Warning: shot {} not valid [omit]'.format(shot.number))
+            print('Warning: shot {} not valid, omitting'.format(shot.number))
         stats.valid = shot.valid
         stats.machine = shot.machine
         return stats
@@ -427,7 +443,7 @@ class MinMaxNormalizer(Normalizer):
 
     def apply(self, shot):
         apply_positivity(shot)
-        assert self.minimums is not None and self.maximums is not None
+        assert(self.minimums is not None and self.maximums is not None)
         m = shot.machine
         curr_range = (self.maximums[m] - self.minimums[m])
         if curr_range == 0.0:
@@ -457,7 +473,7 @@ class MinMaxNormalizer(Normalizer):
             self.print_summary(action='saved')
 
     def load_stats(self, verbose=False):
-        assert self.previously_saved_stats()[0]
+        assert(self.previously_saved_stats()[0])
         dat = np.load(self.path, encoding="latin1", allow_pickle=True)
         self.minimums = dat['minimums'][()]
         self.maximums = dat['maximums'][()]
@@ -470,14 +486,11 @@ class MinMaxNormalizer(Normalizer):
             self.print_summary()
 
 
+def get_individual_shot_file(prepath, shot_num, ext='.txt'):
+    return prepath + str(shot_num) + ext
+
+
 def apply_positivity(shot):
-    # if shot.signals_dict is None:
-    #     print(shot)
-
-    # shot.valid is <class 'numpy.bool_'>; next comparison will always fail
-
-    # if shot.valid is False:
-    #     print(shot)
     for (i, sig) in enumerate(shot.signals):
         if hasattr(sig, "is_strictly_positive"):
             # backwards compatibility when this attribute didn't exist
@@ -486,11 +499,3 @@ def apply_positivity(shot):
                 # signal'.format(sig.description))
                 shot.signals_dict[sig] = np.clip(
                     shot.signals_dict[sig], 0, np.inf)
-    # KGF: if "TypeError: 'NoneType' object is not subscriptable" occurs at
-    # this line during inter-epoch inference, it typically indicates a mismatch
-    # of preprocesed_shots/signal_group_X/*.npz, causing a shot to appear in
-    # the validation and/or test set with shot.valid==False and/or missing
-    # signals_dict even after restore(). Need to trap this earlier.
-
-    # TODO(KGF): why would d3d_all preprocessed shots result in this behavior
-    # for d3d_0D training?

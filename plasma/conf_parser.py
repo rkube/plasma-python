@@ -1,12 +1,11 @@
 from __future__ import print_function
-import plasma.global_vars as g
-from plasma.primitives.shots import ShotListFiles
-import data.signals as sig
-from plasma.utils.hashing import myhash_signals
+import global_vars as g
+from shots import ShotListFiles
+import signals as sig
+from hashing import myhash_signals
 # from data.signals import (
 #     all_signals, fully_defined_signals_1D,
 #     jet, d3d)  # nstx
-import os
 import getpass
 import yaml
 
@@ -17,52 +16,54 @@ def parameters(input_file):
     # by default (absent env variable KERAS_BACKEND and/or config file
     # $HOME/.keras/keras.json) "from plasma.conf import conf"
     # via "import keras.backend as K" in targets.py
-    from plasma.models.targets import (
+    from targets import (
         HingeTarget, MaxHingeTarget, BinaryTarget,
-        TTDTarget, TTDInvTarget, TTDLinearTarget
+        TTDTarget, FLATTarget, TTDInvTarget, TTDLinearTarget
         )
     with open(input_file, 'r') as yaml_file:
         params = yaml.load(yaml_file, Loader=yaml.SafeLoader)
         params['user_name'] = getpass.getuser()
-        base_path = params['fs_path']
-        if params['user_subdir']:
-            base_path = os.path.join(base_path, params['user_name'])
-        output_path = params['fs_path_output']
-        if params['user_subdir_output']:
-            output_path = os.path.join(output_path, params['user_name'])
+        output_path = params['fs_path'] + "/" + params['user_name']
+        base_path = output_path
 
         params['paths']['base_path'] = base_path
-        params['paths']['output_path'] = output_path
-        if isinstance(params['paths']['signal_prepath'], list):
-            g.print_unique('Reading from multiple data folders!')
-            params['paths']['signal_prepath'] = [
-                base_path + s for s in params['paths']['signal_prepath']]
+        if isinstance(params['paths']['signal_prepath'],list):
+            print('reading from multiple data folder!**********************************************')
+        
+            params['paths']['signal_prepath'] = [base_path+s for s in params['paths']['signal_prepath']]
         else:
-            params['paths']['signal_prepath'] = (
-                base_path + params['paths']['signal_prepath'])
+            params['paths']['signal_prepath']=base_path+params['paths']['signal_prepath']
         params['paths']['shot_list_dir'] = (
             base_path + params['paths']['shot_list_dir'])
-        # See notes in data/signals.py for details on signal tols relative to
-        # t_disrupt. The following 2x dataset definitions permit progressively
-        # worse signal quality when preprocessing the shots and omitting some
-        if params['paths']['data'] == 'd3d_data_max_tol':
-            # let signals terminate up to 29 ms before t_disrupt on D3D
-            h = myhash_signals(sig.all_signals_max_tol.values())
-        elif params['paths']['data'] == 'd3d_data_garbage':
-            # let up to 3x signals disappear at any time before t_disrupt
-            # (and NaNs?)
-            # -----
-            # temp workaround for identical signal dictionary (but different
-            # omit criteria in shots.py Shot.get_signals_and_times_from_file())
-            # ---> 2x hash int
-            # TODO(KGF): not robust; create reproducible specification and
-            # recording of signal filtering procedure
-            h = myhash_signals(sig.all_signals_max_tol.values())*2
-        else:
-            h = myhash_signals(sig.all_signals.values())
-
+        params['paths']['output_path'] = output_path
+        if params['paths']['data']=='d3d_data_gar18':
+           h = myhash_signals(sig.all_signals_gar18.values())
+        elif params['paths']['data']=='d3d_data_n1rms':
+           h = myhash_signals(sig.all_signals_n1rms.values())
+        elif params['paths']['data']=='d3d_data_fs07':
+           h = myhash_signals(sig.all_signals_fs07.values())
+        elif params['paths']['data']=='d3d_data_ped':
+           h = myhash_signals(sig.all_signals_ped.values())
+        elif params['paths']['data']=='d3d_data_ped_spec':
+           h = myhash_signals(sig.all_signals_ped_spec.values())
+        elif params['paths']['data']=='d3d_data_n1rms_thomson':
+           h = myhash_signals(sig.all_signals_n1rms_thomson.values())
+        elif params['paths']['data']=='d3d_data_n1rms_qmin':
+           h = myhash_signals(sig.all_signals_n1rms_qmin.values())
+        elif params['paths']['data']=='d3d_data_thomson':
+           h = myhash_signals(sig.all_signals_thomson.values())
+        elif params['paths']['data']=='d3d_data_garbage':
+           h = myhash_signals(sig.all_signals_gar18.values())*2
+        elif params['paths']['data']=='d3d_data_real_time':
+           h = myhash_signals(sig.all_signals_real_time.values())
+        elif params['paths']['data']=='d3d_data_real_time_0D':
+           h = myhash_signals(sig.all_signals_real_time_0D.values())
+        elif params['paths']['data']=='d3d_data_ori':
+           h = myhash_signals(sig.all_signals_ori.values())*2
+        else:   
+           h = myhash_signals(sig.all_signals.values())#+params['data']['T_min_warn'])
         params['paths']['global_normalizer_path'] = (
-            base_path
+            output_path
             + '/normalization/normalization_signal_group_{}.npz'.format(h))
         if params['training']['hyperparam_tuning']:
             # params['paths']['saved_shotlist_path'] =
@@ -84,11 +85,13 @@ def parameters(input_file):
         params['paths']['tensorboard_save_path'] = (
             output_path + params['paths']['tensorboard_save_path'])
         params['paths']['saved_shotlist_path'] = (
-            params['paths']['base_path'] + '/processed_shotlists/'
+            params['paths']['base_path'] + '/processed_shotlists_torch/'
+            #params['paths']['base_path'] + '/../FRNN/gdong-temp/processed_shotlists_torch/'
             + params['paths']['data']
             + '/shot_lists_signal_group_{}.npz'.format(h))
         params['paths']['processed_prepath'] = (
-            base_path + '/processed_shots/' + 'signal_group_{}/'.format(h))
+        #    output_path + '/processed_shots_torch/' + 'signal_group_{}/'.format(h))
+            output_path + '/../FRNN/gdong-temp/processed_shots_torch/' + 'signal_group_{}/'.format(h))
         # ensure shallow model has +1 -1 target.
         if params['model']['shallow'] or params['target'] == 'hinge':
             params['data']['target'] = HingeTarget
@@ -103,9 +106,10 @@ def parameters(input_file):
             params['data']['target'] = TTDInvTarget
         elif params['target'] == 'ttdlinear':
             params['data']['target'] = TTDLinearTarget
+        elif params['target'] == 'flat':
+            params['data']['target'] = FLATTarget
         else:
-            # TODO(KGF): "Target" base class is unused here
-            g.print_unique('Unknown type of target. Exiting')
+            g.print_unique('Unkown type of target. Exiting')
             exit(1)
 
         # params['model']['output_activation'] =
@@ -114,11 +118,32 @@ def parameters(input_file):
         # params['model']['loss'] = params['data']['target'].loss
 
         # signals
-        if params['paths']['data'] in ['d3d_data_max_tol', 'd3d_data_garbage']:
-            params['paths']['all_signals_dict'] = sig.all_signals_max_tol
+        if params['paths']['data'] in ['d3d_data_gar18','d3d_data_garbage']:
+           params['paths']['all_signals_dict'] = sig.all_signals_gar18
+        elif params['paths']['data']=='d3d_data_n1rms':
+           params['paths']['all_signals_dict'] = sig.all_signals_n1rms
+        elif params['paths']['data']=='d3d_data_fs07':
+           params['paths']['all_signals_dict'] = sig.all_signals_fs07
+        elif params['paths']['data']=='d3d_data_ped':
+           params['paths']['all_signals_dict'] = sig.all_signals_ped
+        elif params['paths']['data']=='d3d_data_ped_spec':
+           params['paths']['all_signals_dict'] = sig.all_signals_ped_spec
+        elif params['paths']['data']=='d3d_data_n1rms_thomson':
+           params['paths']['all_signals_dict'] = sig.all_signals_n1rms_thomson
+        elif params['paths']['data']=='d3d_data_n1rms_qmin':
+           params['paths']['all_signals_dict'] = sig.all_signals_n1rms_qmin
+        elif params['paths']['data']=='d3d_data_thomson':
+           params['paths']['all_signals_dict'] = sig.all_signals_thomson
+        elif params['paths']['data']=='d3d_data_real_time':
+           params['paths']['all_signals_dict'] = sig.all_signals_real_time
+        elif params['paths']['data']=='d3d_data_real_time_0D':
+           params['paths']['all_signals_dict'] = sig.all_signals_real_time_0D
+        elif params['paths']['data']=='d3d_data_ori':
+           params['paths']['all_signals_dict'] = sig.all_signals_ori
+           
         else:
-            params['paths']['all_signals_dict'] = sig.all_signals
-
+           params['paths']['all_signals_dict'] = sig.all_signals
+           
         # assert order
         # q95, li, ip, lm, betan, energy, dens, pradcore, pradedge, pin,
         # pechin, torquein, ipdirect, etemp_profile, edens_profile
@@ -168,25 +193,13 @@ def parameters(input_file):
         d3d_full = ShotListFiles(
             sig.d3d, params['paths']['shot_list_dir'],
             ['d3d_clear_data_avail.txt', 'd3d_disrupt_data_avail.txt'],
-            'd3d data since shot 125500')  # to 168555
-        # superset of d3d_full added in 2019 from C. Rea:
-        d3d_full_2019 = ShotListFiles(
-            sig.d3d, params['paths']['shot_list_dir'],
-            ['d3d_clear_since_2016.txt', 'd3d_disrupt_since_2016.txt'],
-            'd3d data since shot 125500')  # to 180847
+            'd3d data since shot 125500')
+        d3d_full_new = ShotListFiles(sig.d3d,params['paths']['shot_list_dir'],['shots_since_2016_clear.txt','shots_since_2016_disrupt.txt'],'d3d data since shot 125500')
+        d3d_full_new_2021 = ShotListFiles(sig.d3d,params['paths']['shot_list_dir'],['shots_since_2016_clear_temp.txt','shots_since_2016_disrupt.txt'],'d3d data since shot 125500')
         d3d_jenkins = ShotListFiles(
             sig.d3d, params['paths']['shot_list_dir'],
             ['jenkins_d3d_clear.txt', 'jenkins_d3d_disrupt.txt'],
             'Subset of d3d data for Jenkins test')
-
-        # TODO(KGF): currently unused shot list files in project directory
-        # /tigress/FRNN/shot_lists/:
-        # d3d_clear.txt : 40560, 168554
-        # d3d_disrupt   : 100000, 168555
-
-        # TODO(KGF): should /tigress/FRNN/shot_lists/ be organized into subdirs
-        # like the original repo directory data/shot_lists/d3d/, jet/, nstx/ ?
-
         # d3d_jb_full = ShotListFiles(
         #     sig.d3d, params['paths']['shot_list_dir'],
         #     ['shotlist_JaysonBarr_clear.txt',
@@ -196,44 +209,42 @@ def parameters(input_file):
         # nstx_full = ShotListFiles(
         #     nstx, params['paths']['shot_list_dir'],
         #     ['disrupt_nstx.txt'], 'nstx shots (all are disruptive')
-        # ==================
-        # JET DATASETS
-        # ==================
-        if params['paths']['data'] == 'jet_all':
+
+        if params['paths']['data'] == 'jet_data':
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = sig.jet_signals
-        elif params['paths']['data'] == 'jet_0D':
+        elif params['paths']['data'] == 'jet_data_0D':
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = sig.jet_signals_0D
-        elif params['paths']['data'] == 'jet_1D':
+        elif params['paths']['data'] == 'jet_data_1D':
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = sig.jet_signals_1D
-        elif params['paths']['data'] == 'jet_late':
+        elif params['paths']['data'] == 'jet_data_late':
             params['paths']['shot_files'] = [jet_iterlike_wall_late]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = sig.jet_signals
-        elif params['paths']['data'] == 'jet_carbon_to_late_0D':
+        elif params['paths']['data'] == 'jet_data_carbon_to_late_0D':
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = [jet_iterlike_wall_late]
             params['paths']['use_signals_dict'] = sig.jet_signals_0D
-        elif params['paths']['data'] == 'jet_temp_profile':
+        elif params['paths']['data'] == 'jet_data_temp_profile':
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = {
                 'etemp_profile': sig.etemp_profile}
-        elif params['paths']['data'] == 'jet_dens_profile':
+        elif params['paths']['data'] == 'jet_data_dens_profile':
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = {
                 'edens_profile': sig.edens_profile}
-        elif params['paths']['data'] == 'jet_carbon_all':
+        elif params['paths']['data'] == 'jet_carbon_data':
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = sig.jet_signals
-        elif params['paths']['data'] == 'jet_mixed_all':
+        elif params['paths']['data'] == 'jet_mixed_data':
             params['paths']['shot_files'] = [jet_full]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = sig.jet_signals
@@ -241,20 +252,39 @@ def parameters(input_file):
             params['paths']['shot_files'] = [jenkins_jet_carbon_wall]
             params['paths']['shot_files_test'] = [jenkins_jet_iterlike_wall]
             params['paths']['use_signals_dict'] = sig.jet_signals
-        # JET data but with fully defined signals
-        elif params['paths']['data'] == 'jet_fully_defined':
+        # jet data but with fully defined signals
+        elif params['paths']['data'] == 'jet_data_fully_defined':
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = sig.fully_defined_signals
-        # JET data but with fully defined signals
-        elif params['paths']['data'] == 'jet_fully_defined_0D':
+        # jet data but with fully defined signals
+        elif params['paths']['data'] == 'jet_data_fully_defined_0D':
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = sig.fully_defined_signals_0D
-        # ==================
-        # D3D DATASETS
-        # ==================
-        elif params['paths']['data'] == 'd3d_all':
+        elif params['paths']['data'] == 'd3d_data_ori':
+            params['paths']['shot_files'] = [d3d_full]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = {
+                'q95': sig.q95,
+                'li': sig.li,
+                'ipori': sig.ipori,
+                'lm': sig.lm,
+                'betan': sig.betan,
+                'energy': sig.energy,
+                'dens': sig.dens,
+                'pradcore': sig.pradcore,
+                'pradedge': sig.pradedge,
+                'pin': sig.pin,
+                'torquein': sig.torquein,
+                'ipdirect': sig.ipdirect,
+                'iptarget': sig.iptarget,
+                'iperr': sig.iperr,
+                'etemp_profile': sig.etemp_profile,
+                'edens_profile': sig.edens_profile,
+            }
+
+        elif params['paths']['data'] == 'd3d_data':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = {
@@ -275,9 +305,8 @@ def parameters(input_file):
                 'etemp_profile': sig.etemp_profile,
                 'edens_profile': sig.edens_profile,
             }
-        elif params['paths']['data'] in ['d3d_data_max_tol',
-                                         'd3d_data_garbage']:
-            params['paths']['shot_files'] = [d3d_full_2019]
+        elif params['paths']['data'] in ['d3d_data_gar18','d3d_data_garbage']:
+            params['paths']['shot_files'] = [d3d_full_new]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = {
                 'q95t': sig.q95t,
@@ -297,8 +326,172 @@ def parameters(input_file):
                 'etemp_profilet': sig.etemp_profilet,
                 'edens_profilet': sig.edens_profilet,
             }
-        elif params['paths']['data'] == 'd3d_2019':
-            params['paths']['shot_files'] = [d3d_full_2019]
+
+        elif params['paths']['data'] in ['d3d_data_thomson']:
+            params['paths']['shot_files'] = [d3d_full_new]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = {
+                'q95t': sig.q95,
+                'lit': sig.li,
+                'ipt': sig.ip,
+                'lmt': sig.lm,
+                'betant': sig.betan,
+                'energyt': sig.energy,
+                'denst': sig.dens,
+                'pradcoret': sig.pradcore,
+                'pradedget': sig.pradedge,
+                'pint': sig.pin,
+                'torqueint': sig.torquein,
+                'ipdirectt': sig.ipdirect,
+                'iptargett': sig.iptarget,
+                'iperrt': sig.iperr,
+                'etemp_profile_thomson': sig.etemp_profile_thomson,
+                'edens_profile_thomson': sig.edens_profile_thomson,
+            }
+        
+        elif params['paths']['data'] in ['d3d_data_n1rms_qmin']:
+            params['paths']['shot_files'] = [d3d_full_new]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = {
+                'q95': sig.q95,
+                'qmin': sig.qmin,
+                'li': sig.li,
+                'ip': sig.ip,
+                'lm': sig.lm,
+                'betan': sig.betan,
+                'energy': sig.energy,
+                'dens': sig.dens,
+                'pradcore': sig.pradcore,
+                'pradedge': sig.pradedge,
+                'pin': sig.pin,
+                'torquein': sig.torquein,
+                'ipdirect': sig.ipdirect,
+                'iptarget': sig.iptarget,
+                'iperr': sig.iperr,
+                'etemp_profile': sig.etemp_profile,
+                'edens_profile': sig.edens_profile,
+                'n1_rms': sig.n1_rms,
+                'n1_rms_no_shift': sig.n1_rms_no_shift,
+            }
+
+
+        elif params['paths']['data'] in ['d3d_data_n1rms_thomson']:
+            params['paths']['shot_files'] = [d3d_full_new]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = {
+                'q95_EFITRT1': sig.q95_EFITRT1,
+                'li': sig.li,
+                'ip': sig.ip,
+                'lm': sig.lm,
+                'betan': sig.betan,
+                'energy': sig.energy,
+                'dens': sig.dens,
+                'pradcore': sig.pradcore,
+                'pradedge': sig.pradedge,
+                'pin': sig.pin,
+                'torquein': sig.torquein,
+                'ipdirect': sig.ipdirect,
+                'iptarget': sig.iptarget,
+                'iperr': sig.iperr,
+                'etemp_profile_thomson': sig.etemp_profile_thomson,
+                'edens_profile_thomson': sig.edens_profile_thomson,
+                'n1_rms': sig.n1_rms,
+                'n1_rms_no_shift': sig.n1_rms_no_shift,
+            }
+
+        elif params['paths']['data'] in ['d3d_data_fs07']:
+            params['paths']['shot_files'] = [d3d_full_new]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = {
+                'q95': sig.q95,
+                'li': sig.li,
+                'fs07': sig.fs07,
+                'ip': sig.ip,
+                'lm': sig.lm,
+                'betan': sig.betan,
+                'energy': sig.energy,
+                'dens': sig.dens,
+                'pradcore': sig.pradcore,
+                'pradedge': sig.pradedge,
+                'pin': sig.pin,
+                'torquein': sig.torquein,
+                'ipdirect': sig.ipdirect,
+                'iptarget': sig.iptarget,
+                'iperr': sig.iperr,
+                'etemp_profile': sig.etemp_profile,
+                'edens_profile': sig.edens_profile,
+                'n1_rms': sig.n1_rms,
+                'n1_rms_no_shift': sig.n1_rms_no_shift,
+            }
+
+        elif params['paths']['data'] in ['d3d_data_ped_spec']:
+            params['paths']['shot_files'] = [d3d_full_new_2021]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = {
+                'q95': sig.q95,
+                'qpsi_efitrt1': sig.qpsi_efitrt1,
+              #  'pres_prime_profile': sig.pres_prime_profile,
+                #'li': sig.li,
+                'fs07': sig.fs07,
+                'neped': sig.neped,
+                'peped': sig.peped,
+                'newid': sig.newid,
+                'teped': sig.teped,
+                'tewid': sig.tewid,
+                'ip': sig.ip,
+                'lm': sig.lm,
+                'betan': sig.betan,
+                'energy': sig.energy,
+                'dens': sig.dens,
+                'pradcore': sig.pradcore,
+                'pradedge': sig.pradedge,
+                'pin': sig.pin,
+                'torquein': sig.torquein,
+                #'ipdirect': sig.ipdirect,
+             #   'iptarget': sig.iptarget,
+             #   'iperr': sig.iperr,
+                'etemp_profile': sig.etemp_profile,
+                'edens_profile': sig.edens_profile,
+                'mpi66m322d_spec_profile': sig.mpi66m322d_spec_profile,
+                'n1_rms': sig.n1_rms,
+            #    'n2_rms_10': sig.n2_rms_10,
+            #    'n3_rms_10': sig.n3_rms_10,
+            }
+
+        elif params['paths']['data'] in ['d3d_data_ped']:
+            params['paths']['shot_files'] = [d3d_full_new_2021]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = {
+                'q95': sig.q95,
+                #'li': sig.li,
+                'fs07': sig.fs07,
+                'neped': sig.neped,
+                'peped': sig.peped,
+                'newid': sig.newid,
+                'teped': sig.teped,
+                'tewid': sig.tewid,
+                'ip': sig.ip,
+                'lm': sig.lm,
+                'betan': sig.betan,
+                'energy': sig.energy,
+                'dens': sig.dens,
+                'pradcore': sig.pradcore,
+                'pradedge': sig.pradedge,
+                'pin': sig.pin,
+                'torquein': sig.torquein,
+                #'ipdirect': sig.ipdirect,
+             #   'iptarget': sig.iptarget,
+             #   'iperr': sig.iperr,
+                'etemp_profile': sig.etemp_profile,
+                'edens_profile': sig.edens_profile,
+                'n1_rms': sig.n1_rms,
+                'n2_rms_10': sig.n2_rms_10,
+                'n3_rms_10': sig.n3_rms_10,
+            }
+
+
+        elif params['paths']['data'] in ['d3d_data_n1rms']:
+            params['paths']['shot_files'] = [d3d_full_new]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = {
                 'q95': sig.q95,
@@ -317,10 +510,13 @@ def parameters(input_file):
                 'iperr': sig.iperr,
                 'etemp_profile': sig.etemp_profile,
                 'edens_profile': sig.edens_profile,
+                'n1_rms': sig.n1_rms,
+                'n1_rms_no_shift': sig.n1_rms_no_shift,
             }
-        elif params['paths']['data'] == 'd3d_2019_all_dims':
-            params['paths']['shot_files'] = [d3d_full_2019]
-            params['paths']['shot_files_test'] = []
+
+        elif params['paths']['data'] == 'd3d_data_new':
+            params['paths']['shot_files'] = [d3d_full_new]
+            params['paths']['shot_files_test'] = [] 
             params['paths']['use_signals_dict'] = {
                 'q95': sig.q95,
                 'li': sig.li,
@@ -338,9 +534,50 @@ def parameters(input_file):
                 'iperr': sig.iperr,
                 'etemp_profile': sig.etemp_profile,
                 'edens_profile': sig.edens_profile,
-                'ecei': sig.ecei,
             }
-        elif params['paths']['data'] == 'd3d_1D':
+        elif params['paths']['data'] == 'd3d_data_real_time':
+            params['paths']['shot_files'] = [d3d_full_new]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = {
+                'q95_EFITRT1': sig.q95_EFITRT1,
+                'li': sig.li,
+                'ip': sig.ip,
+                'lm': sig.lm,
+                'betan': sig.betan,
+                'energy': sig.energy,
+                'dens': sig.dens,
+                'pradcore': sig.pradcore,
+                'pradedge': sig.pradedge,
+                'pin': sig.pin,
+                'torquein': sig.torquein,
+                'ipdirect': sig.ipdirect,
+                'iptarget': sig.iptarget,
+                'iperr': sig.iperr,
+                'etemp_profile': sig.etemp_profile,
+                'edens_profile': sig.edens_profile,
+            }
+        elif params['paths']['data'] == 'd3d_data_real_time_0D':
+            params['paths']['shot_files'] = [d3d_full_new]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = {
+                'q95_EFITRT1': sig.q95_EFITRT1,
+                'li': sig.li,
+                'ip': sig.ip,
+                'lm': sig.lm,
+                'betan': sig.betan,
+                'energy': sig.energy,
+                'dens': sig.dens,
+                'pin': sig.pin,
+            #    'vd': sig.vd,
+                'torquein': sig.torquein,
+                'ipdirect': sig.ipdirect,
+                'iptarget': sig.iptarget,
+                'iperr': sig.iperr,
+            }
+
+
+
+        elif params['paths']['data'] == 'd3d_data_1D':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = {
@@ -348,13 +585,7 @@ def parameters(input_file):
                 'etemp_profile': sig.etemp_profile,
                 'edens_profile': sig.edens_profile,
             }
-        elif params['paths']['data'] == 'd3d_2D':
-            params['paths']['shot_files'] = [d3d_full_2019]
-            params['paths']['shot_files_test'] = []
-            params['paths']['use_signals_dict'] = {
-                'ecei': sig.ecei,
-            }
-        elif params['paths']['data'] == 'd3d_all_profiles':
+        elif params['paths']['data'] == 'd3d_data_all_profiles':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = {
@@ -370,7 +601,7 @@ def parameters(input_file):
                 'bootstrap_current_profile': sig.bootstrap_current_profile,
                 'q_psi_profile': sig.q_psi_profile,
             }
-        elif params['paths']['data'] == 'd3d_0D':
+        elif params['paths']['data'] == 'd3d_data_0D':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = {
@@ -389,12 +620,10 @@ def parameters(input_file):
                 'iptarget': sig.iptarget,
                 'iperr': sig.iperr,
             }
-        # TODO(KGF): rename. Unlike JET, there are probably differences between
-        # sig.d3d_signals and the manually-defined sigs in above d3d_all
-        # elif params['paths']['data'] == 'd3d_all':
-        #     params['paths']['shot_files'] = [d3d_full]
-        #     params['paths']['shot_files_test'] = []
-        #     params['paths']['use_signals_dict'] = sig.d3d_signals
+        elif params['paths']['data'] == 'd3d_data_all':
+            params['paths']['shot_files'] = [d3d_full]
+            params['paths']['shot_files_test'] = []
+            params['paths']['use_signals_dict'] = sig.d3d_signals
         elif params['paths']['data'] == 'jenkins_d3d':
             params['paths']['shot_files'] = [d3d_jenkins]
             params['paths']['shot_files_test'] = []
@@ -417,55 +646,54 @@ def parameters(input_file):
                 'edens_profile': sig.edens_profile,
             }
         # jet data but with fully defined signals
-        elif params['paths']['data'] == 'd3d_fully_defined':
+        elif params['paths']['data'] == 'd3d_data_fully_defined':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = sig.fully_defined_signals
         # jet data but with fully defined signals
-        elif params['paths']['data'] == 'd3d_fully_defined_0D':
+        elif params['paths']['data'] == 'd3d_data_fully_defined_0D':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = sig.fully_defined_signals_0D
-        elif params['paths']['data'] == 'd3d_temp_profile':
+        elif params['paths']['data'] == 'd3d_data_temp_profile':
             # jet data but with fully defined signals
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = {
                 'etemp_profile': sig.etemp_profile}  # fully_defined_signals_0D
-        elif params['paths']['data'] == 'd3d_dens_profile':
+        elif params['paths']['data'] == 'd3d_data_dens_profile':
             # jet data but with fully defined signals
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []
             params['paths']['use_signals_dict'] = {
                 'edens_profile': sig.edens_profile}  # fully_defined_signals_0D
-        # ======================
-        # CROSS-MACHINE DATASETS
-        # ======================
-        elif params['paths']['data'] == 'jet_to_d3d_all':
+
+        # cross-machine
+        elif params['paths']['data'] == 'jet_to_d3d_data':
             params['paths']['shot_files'] = [jet_full]
             params['paths']['shot_files_test'] = [d3d_full]
             params['paths']['use_signals_dict'] = sig.fully_defined_signals
-        elif params['paths']['data'] == 'd3d_to_jet_all':
+        elif params['paths']['data'] == 'd3d_to_jet_data':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = sig.fully_defined_signals
-        elif params['paths']['data'] == 'd3d_to_late_jet':
+        elif params['paths']['data'] == 'd3d_to_late_jet_data':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = [jet_iterlike_wall_late]
             params['paths']['use_signals_dict'] = sig.fully_defined_signals
-        elif params['paths']['data'] == 'jet_to_d3d_0D':
+        elif params['paths']['data'] == 'jet_to_d3d_data_0D':
             params['paths']['shot_files'] = [jet_full]
             params['paths']['shot_files_test'] = [d3d_full]
             params['paths']['use_signals_dict'] = sig.fully_defined_signals_0D
-        elif params['paths']['data'] == 'd3d_to_jet_0D':
+        elif params['paths']['data'] == 'd3d_to_jet_data_0D':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = sig.fully_defined_signals_0D
-        elif params['paths']['data'] == 'jet_to_d3d_1D':
+        elif params['paths']['data'] == 'jet_to_d3d_data_1D':
             params['paths']['shot_files'] = [jet_full]
             params['paths']['shot_files_test'] = [d3d_full]
             params['paths']['use_signals_dict'] = sig.fully_defined_signals_1D
-        elif params['paths']['data'] == 'd3d_to_jet_1D':
+        elif params['paths']['data'] == 'd3d_to_jet_data_1D':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = sig.fully_defined_signals_1D
@@ -475,7 +703,7 @@ def parameters(input_file):
                 params['paths']['data']))
             exit(1)
 
-        if len(params['paths']['specific_signals']):
+        if 'specific_signals' in params['paths'] and len(params['paths']['specific_signals']):
             for s in params['paths']['specific_signals']:
                 if s not in params['paths']['use_signals_dict'].keys():
                     g.print_unique(
@@ -503,7 +731,7 @@ def parameters(input_file):
                            params['paths']['use_signals']))
         params['paths']['shot_files_all'] = (
             params['paths']['shot_files'] + params['paths']['shot_files_test'])
-        params['paths']['all_machines'] = list(
+        params['paths']['all_machines'] = list and(
             set([file.machine for file in params['paths']['shot_files_all']]))
 
         # type assertations

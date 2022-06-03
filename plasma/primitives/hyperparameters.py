@@ -33,6 +33,7 @@ class Hyperparam(object):
 
 
 class CategoricalHyperparam(Hyperparam):
+
     def __init__(self, path, values):
         self.path = path
         self.values = values
@@ -42,6 +43,7 @@ class CategoricalHyperparam(Hyperparam):
 
 
 class GridCategoricalHyperparam(Hyperparam):
+
     def __init__(self, path, values):
         self.path = path
         self.values = iter(values)
@@ -99,22 +101,27 @@ class HyperparamExperiment(object):
         self.path = path
         self.finished = False
         self.success = False
-        self.logs_path = os.path.join(path, "csv_logs/")
+        self.logs_path = (path+ "/epoch_train_log.txt")
         self.raw_logs_path = path[:-1] + ".out"
         self.changed_path = os.path.join(path, "changed_params.out")
         with open(os.path.join(self.path, conf_name), 'r') as yaml_file:
             conf = yaml.load(yaml_file, Loader=yaml.SafeLoader)
-        self.name_to_monitor = conf['callbacks']['monitor']
+        self.name_to_monitor = 'Val Loss'#conf['callbacks']['monitor']
         self.load_data()
         self.get_changed()
         self.get_maximum()
+        self.get_minimum()
         self.read_raw_logs()
 
     def __lt__(self, other):
         return self.path.__lt__(other.path)
 
     def get_number(self):
-        return int(os.path.basename(self.path[:-1]))
+        try:
+          ret=int(os.path.basename(self.path[:-1]))
+        except:
+          ret=self.path[:-1]
+        return ret #int(os.path.basename(self.path[:-1]))
 
     def __str__(self):
         s = "Experiment:\n"
@@ -124,6 +131,7 @@ class HyperparamExperiment(object):
         s += self.changed
         s += '-'*20+"\n"
         s += "Maximum of {} at epoch {}\n".format(*self.get_maximum(False))
+        s += "Minimum of {} at epoch {}\n".format(*self.get_minimum(False))
         s += '-'*20+"\n"
         return s
 
@@ -131,18 +139,23 @@ class HyperparamExperiment(object):
         s = "Finished" if self.finished else "Running"
         print("# {} [{}] maximum of {} at epoch {}".format(
             self.get_number(), s, *self.get_maximum(False)))
+        print("# {} [{}] minimum of {} at epoch {}".format(
+            self.get_number(), s, *self.get_minimum(False)))
 
     def load_data(self):
-        import pandas
-        if os.path.exists(self.logs_path):
-            files = os.listdir(self.logs_path)
-            assert len(files) == 1
-            self.logs_path = self.logs_path + files[0]
+        print('reading log',self.logs_path)
+        if os.path.isfile(self.logs_path):
             if os.path.getsize(self.logs_path) > 0:
-                dat = pandas.read_csv(self.logs_path)
-                self.epochs = np.array(dat['epoch'])
-                self.values = np.array(dat[self.name_to_monitor])
-                self.dat = dat
+              self.epochs=[]
+              self.values=[]
+              self.dat=[]
+              with open(self.logs_path, 'r') as file:
+                lines = file.readlines()
+                for l in lines[1:]:
+                   l=l.strip().split()
+                   self.dat.append(l)
+                   self.epochs.append(float(l[0]))
+                   self.values.append(float(l[2]))
                 print("loaded logs")
                 print(self.epochs)
                 print(self.values)
@@ -181,4 +194,15 @@ class HyperparamExperiment(object):
                     s, self.values[idx], self.epochs[idx]))
             return self.values[idx], self.epochs[idx]
         else:
-            return -1, -1
+            return -10000000, -1000000
+    def get_minimum(self, verbose=True):
+        if len(self.epochs) > 0:
+            idx = np.argmin(self.values)
+            s = "Finished" if self.finished else "Running"
+            if verbose:
+                # print(self.path)
+                print("[{}] minimum of {} at epoch {}".format(
+                    s, self.values[idx], self.epochs[idx]))
+            return self.values[idx], self.epochs[idx]
+        else:
+            return 10000000, 10000000

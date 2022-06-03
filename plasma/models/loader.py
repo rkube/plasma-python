@@ -81,7 +81,7 @@ class Loader(object):
                 # Each chunk will be a multiple of the batch size
                 for j, (X, y) in enumerate(zip(X_list, y_list)):
                     num_examples = X.shape[0]
-                    assert num_examples % batch_size == 0
+                    assert(num_examples % batch_size == 0)
                     num_chunks = num_examples//batch_size
                     """
                     The method produces batch-sized training data X and labels
@@ -112,16 +112,13 @@ class Loader(object):
         sig, res = self.get_signal_result_from_shot(shot)
         length = self.conf['model']['length']
         if is_first_fill:  # cut signal to random position
-            # KGF: why random position?
-            # first w.r.t. iteration in an epoch? set by:
-            # num_steps < batch_size
             cut_idx = np.random.randint(res.shape[0]-length+1)
             sig = sig[cut_idx:]
             res = res[cut_idx:]
 
         sig_len = res.shape[0]
         sig_len = (sig_len // length)*length  # make divisible by lenth
-        assert sig_len > 0
+        assert(sig_len > 0)
         batch_idx = np.where(end_indices == 0)[0][0]
         if sig_len > Xbuff.shape[1]:
             Xbuff = self.resize_buffer(Xbuff, sig_len+length)
@@ -135,7 +132,7 @@ class Loader(object):
     def return_from_training_buffer(self, Xbuff, Ybuff, end_indices):
         length = self.conf['model']['length']
         end_indices -= length
-        assert np.all(end_indices >= 0)
+        assert(np.all(end_indices >= 0))
         X = 1.0*Xbuff[:, :length, :]
         Y = 1.0*Ybuff[:, :length, :]
         self.shift_buffer(Xbuff, length)
@@ -394,7 +391,8 @@ class Loader(object):
         proc.join()
         queue.close()
 
-    def load_as_X_y_list(self, shot_list, prediction_mode=False):
+    def load_as_X_y_list(self, shot_list, verbose=False,
+                         prediction_mode=False):
         """
         The method turns a ShotList into a set of equal-sized patches which
         contain a number of examples that is a multiple of the batch size.
@@ -410,6 +408,7 @@ class Loader(object):
 
         Argument list:
           - shot_list: a ShotList
+          - verbose: TO BE DEPRECATED, self.verbose data member is used instead
           - prediction_mode: unused
 
         Returns:
@@ -433,7 +432,8 @@ class Loader(object):
                 len(res_patches[0]), len(res_patches)))
         return X_list, y_list
 
-    def load_as_X_y_pred(self, shot_list, custom_batch_size=None):
+    def load_as_X_y_pred(self, shot_list, verbose=False,
+                         custom_batch_size=None):
         (signals, results, shot_lengths,
          disruptive) = self.get_signals_results_from_shotlist(
              shot_list, prediction_mode=True)
@@ -454,8 +454,8 @@ class Loader(object):
         shot_lengths = []
         total_length = 0
         for shot in shot_list:
-            assert isinstance(shot, Shot)
-            assert shot.valid
+            assert(isinstance(shot, Shot))
+            assert(shot.valid)
             shot.restore(prepath)
 
             if self.normalizer is not None:
@@ -466,8 +466,27 @@ class Loader(object):
 
             if self.conf['training']['use_mock_data']:
                 signal, ttd = self.get_mock_data()
-            ttd, signal = shot.get_data_arrays(
-                use_signals, self.conf['data']['floatx'])
+            try: 
+                target_description=self.conf['training']['target_description']
+            except:
+                print(sys.exc_info())
+                target_description=['Locked mode amplitude']
+            try:
+                test_target = target_description[0]
+            except:
+                target_description = [target_description]
+            try:
+                predict_time=self.conf['training']['predict_time']
+            except:
+                print(sys.exc_info())
+                predict_time=30
+            try:
+                predict_mode=self.conf['training']['predict_mode']
+            except:
+                print(sys.exc_info())
+                predict_mode='shift_target'
+            ttd, signal = shot.get_data_arrays_lmtarget(
+                use_signals, self.conf['data']['floatx'],predict_time=predict_time,predict_mode=predict_mode,target_description=target_description)
             if len(ttd) < self.conf['model']['length']:
                 print(ttd)
                 print(shot)
@@ -490,26 +509,42 @@ class Loader(object):
     def get_signal_result_from_shot(self, shot, prediction_mode=False):
         prepath = self.conf['paths']['processed_prepath']
         use_signals = self.conf['paths']['use_signals']
-        assert isinstance(shot, Shot)
-        assert shot.valid
+        assert(isinstance(shot, Shot))
+        assert(shot.valid)
         shot.restore(prepath)
-        if self.normalizer is not None:
-            self.normalizer.apply(shot)
-        else:
-            print('Warning, no normalization. ',
-                  'Training data may be poorly conditioned')
+        #if self.normalizer is not None:
+        self.normalizer.apply(shot)
+        #else:
+       #     print('Warning, no normalization. ',
+       #           'Training data may be poorly conditioned')
 
         if self.conf['training']['use_mock_data']:
             signal, ttd = self.get_mock_data()
-        ttd, signal = shot.get_data_arrays(
-            use_signals, self.conf['data']['floatx'])
-        if len(ttd) < self.conf['model']['length']:
+        try: 
+                target_description=self.conf['training']['target_description']
+        except:
+                print(sys.exc_info())
+                target_description='Locked mode amplitude'
+        try:
+                predict_time=self.conf['training']['predict_time']
+        except:
+                print(sys.exc_info())
+                predict_time=30
+        try:
+                predict_mode=self.conf['training']['predict_mode']
+        except:
+                print(sys.exc_info())
+                predict_mode='shift_target'
+        ttd, signal = shot.get_data_arrays_lmtarget(
+            use_signals, self.conf['data']['floatx'],predict_time=predict_time,predict_mode=predict_mode,target_description=target_description)
+        if (ttd.shape[0]) < self.conf['model']['length']:
             print(ttd)
             print(shot)
             print(shot.number)
+            print(ttd.shape[0])
             print("Shot must be at least as long as the RNN length.")
-            exit(1)
-
+            print('WARNING......BADSHOT ...................................BADSHOT')
+          #  exit(1)
         if len(ttd.shape) == 1:
             ttd = np.expand_dims(ttd, axis=1)
         shot.make_light()
@@ -521,7 +556,7 @@ class Loader(object):
     def batch_output_to_array(self, output, batch_size=None):
         if batch_size is None:
             batch_size = self.conf['model']['pred_batch_size']
-        assert output.shape[0] % batch_size == 0
+        assert(output.shape[0] % batch_size == 0)
         num_chunks = output.shape[0] // batch_size
         num_timesteps = output.shape[1]
         feature_size = output.shape[2]
@@ -553,7 +588,7 @@ class Loader(object):
         res_patches = []
         if len(sig) <= min_len:
             print('signal length: {}'.format(len(sig)))
-        assert min_len <= len(sig)
+        assert(min_len <= len(sig))
         for start in range(0, len(sig)-min_len, min_len):
             sig_patches.append(sig[start:start+min_len])
             res_patches.append(res[start:start+min_len])
@@ -636,12 +671,13 @@ class Loader(object):
         total_num = int(np.ceil(1.0 * num_already / total_num)) * total_num
 
         num_additional = total_num - num_already
-        assert num_additional >= 0
+        assert(num_additional >= 0)
         sig_patches_rand, res_patches_rand = self.make_random_patches(
             signals, results, num_additional)
         if self.verbose:
-            print('random to deterministic ratio: {}/{}'.format(num_additional,
-                                                                num_already))
+            print(
+                'random to deterministic ratio: {}/{}'.format(num_additional,
+                                                              num_already))
         return (sig_patches_det + sig_patches_rand,
                 res_patches_det + res_patches_rand)
 
@@ -667,9 +703,9 @@ class Loader(object):
     def arange_patches(self, sig_patches, res_patches):
         num_timesteps = self.conf['model']['length']
         batch_size = self.conf['training']['batch_size']
-        assert len(sig_patches) % batch_size == 0  # fixed number of batches
+        assert(len(sig_patches) % batch_size == 0)  # fixed number of batches
         # divisible by length of RNN sequence
-        assert len(sig_patches[0]) % num_timesteps == 0
+        assert(len(sig_patches[0]) % num_timesteps == 0)
         num_batches = len(sig_patches) // batch_size
         # patch_length = len(sig_patches[0])
 
@@ -698,8 +734,8 @@ class Loader(object):
         if custom_batch_size is not None:
             batch_size = custom_batch_size
 
-        assert len(sig_patches) == batch_size
-        assert len(sig_patches[0]) % num_timesteps == 0
+        assert(len(sig_patches) == batch_size)
+        assert(len(sig_patches[0]) % num_timesteps == 0)
         num_chunks = len(sig_patches[0]) // num_timesteps
         num_dimensions_of_data = sig_patches[0].shape[1]
         if len(res_patches[0].shape) == 1:
@@ -707,8 +743,10 @@ class Loader(object):
         else:
             num_answers = res_patches[0].shape[1]
 
-        X = np.zeros((num_chunks*batch_size, num_timesteps,
-                      num_dimensions_of_data))
+        X = np.zeros(
+            (num_chunks*batch_size,
+             num_timesteps,
+             num_dimensions_of_data))
         if return_sequences:
             y = np.zeros((num_chunks*batch_size, num_timesteps, num_answers))
         else:
@@ -728,9 +766,9 @@ class Loader(object):
                         :] = res_patches[patch_idx][src_end-1]
         return X, y
 
-    def load_as_X_y(self, shot, prediction_mode=False):
-        assert isinstance(shot, Shot)
-        assert shot.valid
+    def load_as_X_y(self, shot, verbose=False, prediction_mode=False):
+        assert(isinstance(shot, Shot))
+        assert(shot.valid)
         prepath = self.conf['paths']['processed_prepath']
         return_sequences = self.conf['model']['return_sequences']
         shot.restore(prepath)
@@ -758,8 +796,8 @@ class Loader(object):
 
     def get_mock_data(self):
         signals = np.linspace(0, 4*np.pi, 10000)
-        rand_idx = np.random.randint(6000)
-        lgth = np.random.randint(1000, 3000)
+        rand_idx = np.randint(6000)
+        lgth = np.randint(1000, 3000)
         signals = signals[rand_idx:rand_idx+lgth]
         # ttd[-100:] = 1
         signals = np.vstack([signals]*8)
@@ -777,7 +815,11 @@ class Loader(object):
         return signals, ttd
 
     def array_to_path_and_external_pred_cut(
-            self, arr, res, return_sequences=False, prediction_mode=False):
+            self,
+            arr,
+            res,
+            return_sequences=False,
+            prediction_mode=False):
         num_timesteps = self.conf['model']['length']
         skip = self.conf['model']['skip']
         if prediction_mode:
@@ -785,11 +827,11 @@ class Loader(object):
             if not return_sequences:
                 num_timesteps = 1
             skip = num_timesteps  # batchsize = 1!
-        assert np.shape(arr)[0] == np.shape(res)[0]
+        assert(np.shape(arr)[0] == np.shape(res)[0])
         num_chunks = len(arr) // num_timesteps
         arr = arr[-num_chunks*num_timesteps:]
         res = res[-num_chunks*num_timesteps:]
-        assert np.shape(arr)[0] == np.shape(res)[0]
+        assert(np.shape(arr)[0] == np.shape(res)[0])
         X = []
         y = []
         i = 0
@@ -803,7 +845,7 @@ class Loader(object):
         for chunk in chunk_range:
             for i in i_range:
                 start = chunk*num_timesteps + i
-                assert start + num_timesteps <= len(arr)
+                assert(start + num_timesteps <= len(arr))
                 X.append(arr[start:start+num_timesteps, :])
                 if return_sequences:
                     y.append(res[start:start+num_timesteps])

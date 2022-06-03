@@ -2,7 +2,6 @@ from __future__ import division
 import datetime
 import uuid
 import os
-# import getpass
 import subprocess as sp
 
 
