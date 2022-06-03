@@ -8,8 +8,6 @@ This work was supported by the DOE CSGF program.
 #########################################################
 '''
 
-from __future__ import print_function
-import global_vars as g
 import os
 import time
 import sys
@@ -214,9 +212,17 @@ class Normalizer(object):
 
 
 class MeanVarNormalizer(Normalizer):
+    """MeanVarNormalizer does ???. """
     def __init__(self, conf):
+        """Initialize:
+
+        Arguments:
+        ----------
+        conf:     conf.yaml dictionary.
+
+        """
         Normalizer.__init__(self, conf)
-        self.means = dict()
+        self.means = dict() 
         self.stds = dict()
         self.bound = np.Inf
         if 'norm_stat_range' in self.conf['data']:

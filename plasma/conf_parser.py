@@ -1,44 +1,39 @@
-from __future__ import print_function
-import plasma.global_vars as g
+#!/usr/bin/env python
+
+from os.path import join
+import yaml
+import getpass
+
 from plasma.primitives.shots import ShotListFiles
 import plasma.data.signals as sig
 from plasma.utils.hashing import myhash_signals
-# from data.signals import (
-#     all_signals, fully_defined_signals_1D,
-#     jet, d3d)  # nstx
-import getpass
-import yaml
+from plasma.models.targets import (
+    HingeTarget, MaxHingeTarget, BinaryTarget,
+    FLATTarget, 
+    TTDTarget, TTDInvTarget, TTDLinearTarget
+    )
 
 
-def parameters(input_file):
+def parse_config(input_file):
     """Parse yaml file of configuration parameters."""
-    # TODO(KGF): the following line imports TensorFlow as a Keras backend
-    # by default (absent env variable KERAS_BACKEND and/or config file
-    # $HOME/.keras/keras.json) "from plasma.conf import conf"
-    # via "import keras.backend as K" in targets.py
-    from plasma.models.targets import (
-        HingeTarget, MaxHingeTarget, BinaryTarget,
-        FLATTarget, 
-        TTDTarget, TTDInvTarget, TTDLinearTarget
-        )
     with open(input_file, 'r') as yaml_file:
         params = yaml.load(yaml_file, Loader=yaml.SafeLoader)
-        params['user_name'] = getpass.getuser()
-        output_path = params['fs_path'] + "/" + params['user_name']
-        base_path = output_path
 
-        print(f"((((((( Loading conf from {input_file} )))))))")
+        # Sets base path for all output
+        params["paths"]["base_path"] = join(params['fs_path'], getpass.getuser())
 
-        params['paths']['base_path'] = base_path
-        if isinstance(params['paths']['signal_prepath'],list):
+        if isinstance(params['paths']['signal_prepath'], list):
             print('reading from multiple data folder!**********************************************')
-        
-            params['paths']['signal_prepath'] = [base_path+s for s in params['paths']['signal_prepath']]
+            params['paths']['signal_prepath'] = [join(params["paths"]["base_path"], s) 
+                    for s in params['paths']['signal_prepath']]
         else:
-            params['paths']['signal_prepath']=base_path+params['paths']['signal_prepath']
-        params['paths']['shot_list_dir'] = (
-            base_path + params['paths']['shot_list_dir'])
-        params['paths']['output_path'] = output_path
+            params['paths']['signal_prepath'] = \
+                    join(params["paths"]["base_path"], 
+                         params['paths']['signal_prepath'])
+        params['paths']['shot_list_dir'] = \
+                join(params["paths"]["base_path"], 
+                     params['paths']['shot_list_dir'])
+
         if params['paths']['data']=='d3d_data_gar18':
            h = myhash_signals(sig.all_signals_gar18.values())
         elif params['paths']['data']=='d3d_data_n1rms':
@@ -65,36 +60,37 @@ def parameters(input_file):
            h = myhash_signals(sig.all_signals_ori.values())*2
         else:   
            h = myhash_signals(sig.all_signals.values())#+params['data']['T_min_warn'])
-        params['paths']['global_normalizer_path'] = (
-            output_path
-            + '/normalization/normalization_signal_group_{}.npz'.format(h))
+
+        
+        params['paths']['global_normalizer_path'] = join(params["paths"]["base_path"], 
+                f"/normalization/normalization_signal_group_{h}.npz")
         if params['training']['hyperparam_tuning']:
             # params['paths']['saved_shotlist_path'] =
             # './normalization/shot_lists.npz'
-            params['paths']['normalizer_path'] = (
-                './normalization/normalization_signal_group_{}.npz'.format(h))
-            params['paths']['model_save_path'] = './model_checkpoints/'
-            params['paths']['csvlog_save_path'] = './csv_logs/'
-            params['paths']['results_prepath'] = './results/'
+            params['paths']['normalizer_path'] = f"./normalization/normalization_signal_group_{h}.npz"
+            params['paths']['model_save_path'] = "model_checkpoints"
+            params['paths']['csvlog_save_path'] = "csv_logs"
+            params['paths']['results_prepath'] = "results"
         else:
             # params['paths']['saved_shotlist_path'] = output_path +
             # '/normalization/shot_lists.npz'
-            params['paths']['normalizer_path'] = (
-                params['paths']['global_normalizer_path'])
-            params['paths']['model_save_path'] = (output_path
-                                                  + '/model_checkpoints/')
-            params['paths']['csvlog_save_path'] = output_path + '/csv_logs/'
-            params['paths']['results_prepath'] = output_path + '/results/'
-        params['paths']['tensorboard_save_path'] = (
-            output_path + params['paths']['tensorboard_save_path'])
-        params['paths']['saved_shotlist_path'] = (
-            params['paths']['base_path'] + '/processed_shotlists_torch/'
+            params['paths']['normalizer_path'] = params['paths']['global_normalizer_path']
+            params['paths']['model_save_path'] = join(params["paths"]["base_path"], "model_checkpoints")
+            params['paths']['csvlog_save_path'] = join(params["paths"]["base_path"], "csv_logs")
+            params['paths']['results_prepath'] =  join(params["paths"]["base_path"], "results")
+
+        params['paths']['saved_shotlist_path'] = join(params["paths"]["base_path"],
+                "processed_shotlists_torch")
+        params['paths']['base_path'] + "processed_shotlists_torch"
             #params['paths']['base_path'] + '/../FRNN/gdong-temp/processed_shotlists_torch/'
-            + params['paths']['data']
-            + '/shot_lists_signal_group_{}.npz'.format(h))
-        params['paths']['processed_prepath'] = (
-        #    output_path + '/processed_shots_torch/' + 'signal_group_{}/'.format(h))
-            output_path + '/../FRNN/gdong-temp/processed_shots_torch/' + 'signal_group_{}/'.format(h))
+            #+ params['paths']['data']
+            #+ '/shot_lists_signal_group_{}.npz'.format(h))
+
+        params['paths']['processed_prepath'] = \
+            join(params["paths"]["base_path"], 
+                 "../FRNN/rkube-temp/processed_shots_torch",
+                 "signal_group_{h}")
+
         # ensure shallow model has +1 -1 target.
         if params['model']['shallow'] or params['target'] == 'hinge':
             params['data']['target'] = HingeTarget
@@ -720,19 +716,22 @@ def parameters(input_file):
                     params['paths']['specific_signals']))
             selected_signals = {k: params['paths']['use_signals_dict'][k]
                                 for k in params['paths']['specific_signals']}
-            params['paths']['use_signals'] = sort_by_channels(
-                list(selected_signals.values()))
+
+            # 'use_signals' will contain a list of channels, sorted by number
+            # of channels
+            #params['paths']['use_signals'] = sort_by_channels(
+            #    list(selected_signals.values()))
+            params["paths"]["use_signals"] = list(selected_signals.values()).sort(key = lambda x:x.num_channels)
         else:
-            # default case
-            params['paths']['use_signals'] = sort_by_channels(
-                list(params['paths']['use_signals_dict'].values()))
+            #params['paths']['use_signals'] = sort_by_channels(
+            #    list(params['paths']['use_signals_dict'].values()))
+            params["paths"]["use_signals"] = list(params["paths"]["use_signals_dict"].values()).sort(key = lambda x: x.num_channels)
 
-        params['paths']['all_signals'] = sort_by_channels(
-            list(params['paths']['all_signals_dict'].values()))
+        #params['paths']['all_signals'] = sort_by_channels(
+        #    list(params['paths']['all_signals_dict'].values()))
+        params["paths"]["all_signals"] = list(params["paths"]["all_signals_dict"].values()).sort(key = lambda x: x.num_channels)
 
-        g.print_unique("Selected signals (determines which signals are used"
-                       + " for training):\n{}".format(
-                           params['paths']['use_signals']))
+        print(f"Selected signals (determines which signals are used for training):\n{params['paths']['use_signals']}")
         params['paths']['shot_files_all'] = (
             params['paths']['shot_files'] + params['paths']['shot_files_test'])
         params['paths']['all_machines'] = list and(
@@ -746,6 +745,3 @@ def parameters(input_file):
     return params
 
 
-def sort_by_channels(list_of_signals):
-    # make sure 1D signals come last! This is necessary for model builder.
-    return sorted(list_of_signals, key=lambda x: x.num_channels)
