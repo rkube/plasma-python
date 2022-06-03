@@ -6,11 +6,11 @@ import re
 
 from scipy.interpolate import UnivariateSpline
 
-from processing import get_individual_shot_file
-from downloading import get_missing_value_array
-from hashing import myhash
+from plasma.utils.processing import get_individual_shot_file
+from plasma.utils.downloading import get_missing_value_array
+from plasma.utils.hashing import myhash
 
-# class SignalCollection:
+#. class SignalCollection:
 #   """GA Data Obj"""
 #   def __init__(self,signal_descriptions,signal_paths):
 #       self.signals = []

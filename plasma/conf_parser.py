@@ -1,8 +1,8 @@
 from __future__ import print_function
-import global_vars as g
-from shots import ShotListFiles
-import signals as sig
-from hashing import myhash_signals
+import plasma.global_vars as g
+from plasma.primitives.shots import ShotListFiles
+import plasma.data.signals as sig
+from plasma.utils.hashing import myhash_signals
 # from data.signals import (
 #     all_signals, fully_defined_signals_1D,
 #     jet, d3d)  # nstx
@@ -16,15 +16,18 @@ def parameters(input_file):
     # by default (absent env variable KERAS_BACKEND and/or config file
     # $HOME/.keras/keras.json) "from plasma.conf import conf"
     # via "import keras.backend as K" in targets.py
-    from targets import (
+    from plasma.models.targets import (
         HingeTarget, MaxHingeTarget, BinaryTarget,
-        TTDTarget, FLATTarget, TTDInvTarget, TTDLinearTarget
+        FLATTarget, 
+        TTDTarget, TTDInvTarget, TTDLinearTarget
         )
     with open(input_file, 'r') as yaml_file:
         params = yaml.load(yaml_file, Loader=yaml.SafeLoader)
         params['user_name'] = getpass.getuser()
         output_path = params['fs_path'] + "/" + params['user_name']
         base_path = output_path
+
+        print(f"((((((( Loading conf from {input_file} )))))))")
 
         params['paths']['base_path'] = base_path
         if isinstance(params['paths']['signal_prepath'],list):
@@ -699,6 +702,7 @@ def parameters(input_file):
             params['paths']['use_signals_dict'] = sig.fully_defined_signals_1D
 
         else:
+            print("Here")
             g.print_unique("Unknown dataset {}".format(
                 params['paths']['data']))
             exit(1)

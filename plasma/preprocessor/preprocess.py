@@ -9,7 +9,7 @@ This work was supported by the DOE CSGF program.
 '''
 
 from __future__ import print_function
-import global_vars as g
+import plasma.global_vars as g
 from os import listdir  # , remove
 import time
 import sys
