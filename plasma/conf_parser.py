@@ -34,6 +34,7 @@ def parse_config(input_file):
             logging.error(f"Can not use {params['paths']['base_path']} as base_path: {err}")
             raise FileNotFoundError
 
+
         # Set directory list for signal_prepath
         # paths.signal_prepath is a list of directories that will be searched for data
         if isinstance(params['paths']['signal_prepath'], list):
@@ -73,8 +74,7 @@ def parse_config(input_file):
             logging.error(err)
             raise err
             
-
-
+        # This sets some kind of dataset and does some hashing
         if params['paths']['data']=='d3d_data_gar18':
            h = myhash_signals(sig.all_signals_gar18.values())
         elif params['paths']['data']=='d3d_data_n1rms':
@@ -101,12 +101,14 @@ def parse_config(input_file):
            h = myhash_signals(sig.all_signals_ori.values())*2
         else:   
            h = myhash_signals(sig.all_signals.values())#+params['data']['T_min_warn'])
-
         logging.info(f"Hash used: {h}")
 
-        
-        params['paths']['global_normalizer_path'] = join(params["paths"]["base_path"], 
-                f"/normalization/normalization_signal_group_{h}.npz")
+       
+        # 
+        params['paths']['global_normalizer_path'] = \
+                join(params["paths"]["base_path"], 
+                     f"/normalization/normalization_signal_group_{h}.npz")
+
         if params['training']['hyperparam_tuning']:
             # params['paths']['saved_shotlist_path'] =
             # './normalization/shot_lists.npz'
@@ -122,6 +124,7 @@ def parse_config(input_file):
             params['paths']['csvlog_save_path'] = join(params["paths"]["base_path"], "csv_logs")
             params['paths']['results_prepath'] =  join(params["paths"]["base_path"], "results")
 
+        # TODO: What is this parameter used for?
         params['paths']['saved_shotlist_path'] = join(params["paths"]["base_path"],
                                                       "processed_shotlists_torch")
         #params['paths']['base_path'] + "processed_shotlists_torch"
@@ -151,13 +154,7 @@ def parse_config(input_file):
         elif params['target'] == 'flat':
             params['data']['target'] = FLATTarget
         else:
-            g.print_unique('Unkown type of target. Exiting')
-            exit(1)
-
-        # params['model']['output_activation'] =
-        # params['data']['target'].activation
-        # binary crossentropy performs slightly better?
-        # params['model']['loss'] = params['data']['target'].loss
+            logging.error("Unknown type of target: {params['data']['target']}. Exiting")
 
         # signals
         if params['paths']['data'] in ['d3d_data_gar18','d3d_data_garbage']:
@@ -741,18 +738,13 @@ def parse_config(input_file):
             params['paths']['use_signals_dict'] = sig.fully_defined_signals_1D
 
         else:
-            print("Here")
-            g.print_unique("Unknown dataset {}".format(
-                params['paths']['data']))
+            logging.error(f"Unknown dataset {params['paths']['data']}")
             exit(1)
 
         if 'specific_signals' in params['paths'] and len(params['paths']['specific_signals']):
             for s in params['paths']['specific_signals']:
                 if s not in params['paths']['use_signals_dict'].keys():
-                    g.print_unique(
-                        "Signal {} is not fully defined for {} machine. ",
-                        "Skipping...".format(
-                            s, params['paths']['data'].split("_")[0]))
+                    logging.info(f"Signal {s} is not fully defined for {params['paths']['data'].split("_")[0]} machine. Skipping.")
             params['paths']['specific_signals'] = list(
                 filter(
                     lambda x: x in params['paths']['use_signals_dict'].keys(),
@@ -762,19 +754,13 @@ def parse_config(input_file):
 
             # 'use_signals' will contain a list of channels, sorted by number
             # of channels
-            #params['paths']['use_signals'] = sort_by_channels(
-            #    list(selected_signals.values()))
             params["paths"]["use_signals"] = list(selected_signals.values()).sort(key = lambda x:x.num_channels)
         else:
-            #params['paths']['use_signals'] = sort_by_channels(
-            #    list(params['paths']['use_signals_dict'].values()))
             params["paths"]["use_signals"] = list(params["paths"]["use_signals_dict"].values()).sort(key = lambda x: x.num_channels)
 
-        #params['paths']['all_signals'] = sort_by_channels(
-        #    list(params['paths']['all_signals_dict'].values()))
         params["paths"]["all_signals"] = list(params["paths"]["all_signals_dict"].values()).sort(key = lambda x: x.num_channels)
 
-        print(f"Selected signals (determines which signals are used for training):\n{params['paths']['use_signals']}")
+        logging.info(f"Selected signals (determines which signals are used for training):\n{params['paths']['use_signals']}")
         params['paths']['shot_files_all'] = (
             params['paths']['shot_files'] + params['paths']['shot_files_test'])
         params['paths']['all_machines'] = list and(

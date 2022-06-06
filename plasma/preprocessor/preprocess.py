@@ -34,11 +34,13 @@ class Preprocessor(object):
         """Call format_shotlist_twocolumn on a list of shot-lists."""
       
         # Iterate over a list of all directories located in conf['paths']['shot_list_dir']
-
-        paths = [join(shot_list_dir, f) for f in listdir(shot_list_dir) if isfile(join(shot_list_dir, f))]
-        for path in paths
+        # Construct a list of shot lists that are in base_path+shot_list_dir
+        shot_list_path = join(self.conf["paths"]["base_path"], self.conf["paths"]["shot_list_dir"])
+        all_shot_lists = [join(shot_list_path, f) for f in listdir(shot_list_path) if isfile(join(shot_list_path, f))]
+        logging.info(f"all shot_lists = ", all_shot_lists)
+        for shot_list in all_shot_lists:
             # Call clean_shot_list for each of these files
-            self.format_shot_list(path)
+            self.format_shotlist(shot_list)
 
     def format_shotlist(self, path):
         """Re-format a shotlist into two columns.
@@ -60,12 +62,11 @@ class Preprocessor(object):
         Non-disruptive shots have only one column of data. In this case we overwrite
         the datafile with an appended column of -1.
         """
-        
         try:
             data = np.loadtxt(path)
-        except OSError as err:
+        except BaseException as err:
             logging.error(f"Can't clean shot list for path {path}: {err}. Exiting")
-            raise OSError(err)
+            return
 
         logging.info(f"Formatting shot list {path}")
         if len(np.shape(data)) < 2:
@@ -81,13 +82,12 @@ class Preprocessor(object):
 
     def preprocess_all(self):
         """TODO: Deprecated."""
-        logging.error("Preprocess.preprocess_all is deprecated.")
         err_str = "Preprocess.preprocess_all is deprecated. \n Call instead: \n>"
-        err_str  += "'preprocess_from_files(conf['paths']['shot_files_all'], conf['data']['use_shots'])'"
+        err_str += "'preprocess_from_files(conf['paths']['shot_files_all'], conf['data']['use_shots'])'"
+        logging.error(err_str)
         raise DeprecationWarning(err_str)
     def preprocess_from_files(self, shot_files, use_shots):
         """Distribute preprocessing of all signals across process pool.
-
 
         Input:
         ======
@@ -265,13 +265,17 @@ def guarantee_preprocessed(conf, verbose=False):
     # TODO: replace function with definitino here
     #def all_are_preprocessed(self):
     #    return os.path.isfile(self.get_shot_list_path())
-    if os.path.isfile(self.get_shot_list_path())
+    if isfile(conf['paths']['saved_shotlist_path']):
         logging.info(f"{self.get_shot_list_path()} exists. Skipping preprocessing")
         shot_list_train, shot_list_validate, shot_list_test = pp.load_shotlists()
     else:
         logging.info("Formatting shots....")
+        # Make sure the shot lists are properly formatted
         pp.format_shot_lists()
-        shot_list = pp.preprocess_all()
+        # Preprocess all available shots
+        shot_list = pp.preprocess_all(conf["paths"]["shot_files_all"], conf["data"]["use_shots"])
+
+        #shot_list = pp.preprocess_all()
         shot_list.sort()
         shot_list_train, shot_list_test = shot_list.split_train_test(conf)
         # num_shots = len(shot_list_train) + len(shot_list_test)

@@ -8,18 +8,19 @@ This work was supported by the DOE CSGF program.
 #########################################################
 '''
 
-from __future__ import print_function
 import os
 import os.path
 import sys
 import random as rnd
 
 import numpy as np
+import logging
 
-from processing import train_test_split, cut_and_resample_signal
-from downloading import makedirs_process_safe
-from find_elms import *
-from find_rational import *
+from plasma.utils.processing import train_test_split, cut_and_resample_signal
+from plasma.utils.downloading import makedirs_process_safe
+from plasma.utils.find_elms import *
+from plasma.utils.find_rational import *
+
 class ShotListFiles(object):
     def __init__(self, machine, prepath, paths, description=''):
         self.machine = machine
@@ -59,14 +60,14 @@ class ShotListFiles(object):
 
 
 class ShotList(object):
-    '''
+    """ 
     A wrapper class around list of Shot objects, providing utilities to
     extract, load and transform Shots before passing them to an estimator.
 
     During distributed training, shot lists are split into sublists.
     A sublist is a ShotList object having num_at_once shots. The ShotList
     contains an entire dataset as specified in the configuration file.
-    '''
+    """
 
     def __init__(self, shots=None):
         '''
@@ -77,18 +78,13 @@ class ShotList(object):
             assert(all([isinstance(shot, Shot) for shot in shots]))
             self.shots = [shot for shot in shots]
 
-    def load_from_shot_list_files_object(
-            self, shot_list_files_object, signals):
+    def load_from_shot_list_files_object(self, shot_list_files_object, signals):
+        """Constructs a list of shot objects."""
         machine = shot_list_files_object.machine
-        shot_numbers, disruption_times = (
-            shot_list_files_object.get_shot_numbers_and_disruption_times())
+        shot_numbers, disruption_times = shot_list_files_object.get_shot_numbers_and_disruption_times()
         for number, t in list(zip(shot_numbers, disruption_times)):
-            self.append(
-                Shot(number=number, t_disrupt=t, machine=machine,
-                     signals=[s for s in signals if
-                              s.is_defined_on_machine(machine)]
-                     )
-                )
+            self.shots.append(Shot(number=number, t_disrupt=t, machine=machine,
+                                   signals=[s for s in signals if s.is_defined_on_machine(machine)]))
 
     def load_from_shot_list_files_objects(
             self, shot_list_files_objects, signals):
@@ -268,14 +264,13 @@ class ShotList(object):
 
 
 class Shot(object):
-    '''
-    A class representing a shot.
+    """A class representing a shot. 
     Each shot is a measurement of plasma properties (current, locked mode
     amplitude, etc.) as a function of time.
 
     For 0D data, each shot is modeled as a 2D Numpy array - time vs a plasma
     property.
-    '''
+    """
 
     def __init__(
             self,
@@ -287,38 +282,37 @@ class Shot(object):
             valid=None,
             is_disruptive=None,
             t_disrupt=None):
-        '''
+        """Initializes a shot object.
         Shot objects contain following attributes:
 
-         - number: integer, unique identifier of a shot
-         - t_disrupt: double, disruption time in milliseconds (second column in
-         the shotlist input file)
-
-         - ttd: Numpy array of doubles, time profile of the shot converted to
-           time-to-disruption values
-         - valid: boolean flag indicating whether plasma property
-           (specifically, current) reaches a certain value during the shot
-         - is_disruptive: boolean flag indicating whether a shot is disruptive
-        '''
-        self.number = number  # Shot number
-        self.machine = machine  # machine on which it is defined
-        self.signals = signals
-        self.signals_dict = signals_dict
-        self.ttd = ttd
-        self.valid = valid
-        self.is_disruptive = is_disruptive
-        self.t_disrupt = t_disrupt
+         - number.........: integer, unique identifier of a shot
+         - t_disrupt......: double, disruption time in milliseconds (second column in
+                            the shotlist input file)
+         - ttd............: Numpy array of doubles, time profile of the shot converted to
+                             time-to-disruption values
+         - valid..........: boolean flag indicating whether plasma property
+                            (specifically, current) reaches a certain value during the shot
+         - is_disruptive..: boolean flag indicating whether a shot is disruptive
+        """
+        self.number = number               # Shot identifier
+        self.machine = machine             # machine on which the shot is defined
+        self.signals = signals             # List of signals available in the shot
+        self.signals_dict = signals_dict   # Dictionary of signals
+        self.ttd = ttd                     # Timebase of the shot. Approaches zero for disruption
+        self.valid = valid                 # Valid. True if the shot shold be used for training
+        self.is_disruptive = is_disruptive # True if the shot disrupts, false otherwise
+        self.t_disrupt = t_disrupt         # Time of the disruption
         self.weight = 1.0
         self.augmentation_fn = None
         if t_disrupt is not None:
             self.is_disruptive = Shot.is_disruptive_given_disruption_time(
                 t_disrupt)
         else:
-            print('Warning, disruption time (disruptivity) not set! ',
+            logging.info('Warning, disruption time (disruptivity) not set! ',
                   'Either set t_disrupt or is_disruptive')
 
     def get_id_str(self):
-        return '{} : {}'.format(self.machine, self.number)
+        return f"{self.machine} : {self.number}"
 
     def __lt__(self, other):
         return self.get_id_str().__lt__(other.get_id_str())
@@ -334,14 +328,15 @@ class Shot(object):
             16)
 
     def __str__(self):
-        string = 'number: {}\n'.format(self.number)
-        string += 'machine: {}\n'.format(self.machine)
-        string += 'signals: {}\n'.format(self.signals)
-        string += 'signals_dict: {}\n'.format(self.signals_dict)
-        string += 'ttd: {}\n'.format(self.ttd)
-        string += 'valid: {}\n'.format(self.valid)
-        string += 'is_disruptive: {}\n'.format(self.is_disruptive)
-        string += 't_disrupt: {}\n'.format(self.t_disrupt)
+        """String representation of the shot"""
+        string = f"number: {self.number}\n"
+        string += "machine: {self.machine}\n"
+        string += "signals: {self.signal}\n"
+        string += "signals_dict: {signals_dict}\n"
+        string += "ttd: {self.ttd}\n"
+        string += "valid: {self.valid}\n"
+        string += "is_disruptive: {self.is_disruptive}\n"
+        string += "t_disrupt: {self.t_disrupt}\n"
         return string
 
     def num_timesteps(self, prepath):
@@ -351,22 +346,46 @@ class Shot(object):
         return ts
 
     def get_number(self):
+        raise DepreciationWarning("Replace shot.get_number() with shot.number")
+        exit()
         return self.number
 
     def get_signals(self):
+        raise DepreciationWarning("Replace shot.get_signals() with shot.signals")
+        exit()
         return self.signals
 
     def is_valid(self):
+        raise DepreciationWarning("Replace shot.is_valid() is shot.valid")
+        exit()
         return self.valid
 
     def is_disruptive_shot(self):
+        raise DepreciationWarning("Replace shot.is_disruptive_shot() with shot.is_disruptive")
+        exit(0)
         return self.is_disruptive
 
     def get_data_arrays(self, use_signals, dtype='float32'):
+        """Allocates a numpy array for signals in this shot.
+
+        Input:
+        ======
+        use_signals...: list(signals) List of signals to use for data allocation
+        dtype.........: Data type to use for the array. Default=float32
+
+        Allocate a 2d array with dimensions length(time) * sum signal.num_channels
+
+        Output:
+        ======
+
+        t_array.......: ndarray(float)  Time base array
+        signal_array..: ndarray(float)  Array with one signal per column
+        """
+
+
         t_array = self.ttd
-        signal_array = np.zeros(
-            (len(t_array), sum([sig.num_channels for sig in use_signals])),
-            dtype=dtype)
+        signal_array = np.zeros((len(t_array), sum([sig.num_channels for sig in use_signals])),
+                                dtype=dtype)
         curr_idx = 0
         for sig in use_signals:
             signal_array[:, curr_idx:curr_idx
@@ -484,8 +503,7 @@ class Shot(object):
         return [self.signals_dict[sig] for sig in self.signals]
 
     def preprocess(self, conf):
-        sys.stdout.write('\rrecomputing {}'.format(self.number))
-        sys.stdout.flush()
+        logging.info(f"Preprocessing shot {selfnumber}")
         # get minmax times
         time_arrays, signal_arrays, t_min, t_max, valid = (
             self.get_signals_and_times_from_file(conf))
@@ -501,32 +519,57 @@ class Shot(object):
 
 
     def get_signals_and_times_from_file(self, conf):
-        valid = True
-        t_min = -np.Inf
-        t_max = np.Inf
+        """Load signals and time bases for a given shot.
+
+        Input:
+        ======
+        conf.....: Dict, global configuration
+
+        This method loads all signal data and time bases from text files.
+        Used keys from conf:
+        conf["paths"]["data"]   - 
+        conf["data"]["floatx"]  - Datatype, either float32 or float64
+        conf["paths"]["signal_prepath"]
+
+        Output:
+        =======
+
+        time_arrays....: List of time bases for the specified signals
+        signal_arrays..: List of ndarrays for the specified signals
+        t_min..........: Min time of all time bases
+        t_max..........: Max time in all time bases
+        valid..........: True: Good shot. False: Bad shot
+
+        """
+        valid = True            # valid specifies whether we got a good shot or nog
+        t_min = -np.Inf         #
+        t_max = np.Inf          #
         # t_thresh = -1
-        signal_arrays = []
-        time_arrays = []
-        garbage=False
-        # disruptive = self.t_disrupt >= 0
+        signal_arrays = []      # To be populated with a list of ndarrays with shot data
+        time_arrays = []        # To be populated with a list of ndarrays, containing time bases 
+        garbage = False
+        
         if conf['paths']['data'] =='d3d_data_garbage':
             garbage=True
         elif conf['paths']['data'] == 'd3d_data_n1rms_gar' :
             garbage=True
-        non_valid_signals=0
+        non_valid_signals = 0
+
         signal_prepath = conf['paths']['signal_prepath']
-        if self.number in [127613,129423,125726,126662,165910,138821]:
-             return None, None, None, None, False
-        for (i, signal) in enumerate(self.signals):
-            if isinstance(signal_prepath,list):
-              for prepath in signal_prepath:
-                t, sig, valid_signal = signal.load_data(
-                prepath, self, conf['data']['floatx'])
-                if valid_signal:
-                   break
+        # The DIII-D shots below 
+        if self.number in [127613, 129423, 125726, 126662, 165910, 138821]:
+            logging.info(f"get_signals_and_times_frm_file: skipping shot {self.number}")
+            return None, None, None, None, False
+        
+        # Iterate over all signals and extract data
+        for(i, signal) in enumerate(self.signals):
+            # In case of a list, handle each signal individually
+            if isinstance(signal_prepath, list):
+                for prepath in signal_prepath:
+                    t, sig, valid_signal = signal.load_data(prepath, self, conf['data']['floatx'])
             else:
-              t, sig, valid_signal = signal.load_data(
-                signal_prepath, self, conf['data']['floatx'])
+                t, sig, valid_signal = signal.load_data(signal_prepath, self, conf['data']['floatx'])
+
             if not valid_signal:
                 if signal.is_ip or ('n1' in signal.description) or garbage==False or sig==None:
                    ########################Not allow a shot if it is missing plasma current information, or q95 is missing 
@@ -573,23 +616,16 @@ class Shot(object):
         dt = conf['data']['dt']
         if (t_max - t_min)/dt <= (2*conf['model']
                                   ['length']+conf['data']['T_min_warn']):
-            print(
-                'Shot {} contains insufficient data, omitting.'.format(
-                    self.number))
+            logging.error(f"Shot {self.number} contains insufficient data, omitting.")
             valid = False
 
-        assert(
-            t_max > t_min or not valid), "t max: {}, t_min: {}".format(
-            t_max, t_min)
+        assert(t_max > t_min or not valid), f"t max: {t_max}, t_min: {_min}"
 
         if self.is_disruptive:
             assert(self.t_disrupt <= t_max or not valid)
             t_max = self.t_disrupt
         if non_valid_signals>2:
-            print('Shot {}:  '.format(self.number),
-                              'is REALLY garbabge (>=3 channels are contaminated......) ')
-
-            #Omit a shot if more than 3 channels are bad channels....
+            logging.warning(f"Shot {self.number} >=3 channels are contaminated...")
             valid=False
 
         return time_arrays, signal_arrays, t_min, t_max, valid

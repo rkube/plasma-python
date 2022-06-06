@@ -1,21 +1,18 @@
-from __future__ import division
+#!/usr/bin/python
 import numpy as np
 import sys
-import os
+#iimport os
+from os import remove
+from os.path import isfile
 import re
+
+import logging
 
 from scipy.interpolate import UnivariateSpline
 
 from plasma.utils.processing import get_individual_shot_file
 from plasma.utils.downloading import get_missing_value_array
 from plasma.utils.hashing import myhash
-
-#. class SignalCollection:
-#   """GA Data Obj"""
-#   def __init__(self,signal_descriptions,signal_paths):
-#       self.signals = []
-#       for i in range(len(signal_paths))
-#           self.signals.append(Signal(signal_descriptions[i],signal_paths[i]))
 
 try:
     from MDSplus import Connection
@@ -24,6 +21,7 @@ except ImportError:
 
 
 class Signal(object):
+    """Represents a signal."""
     def __init__(self, description, paths, machines, tex_label=None,
                  causal_shifts=None, is_ip=False, normalize=True,
                  data_avail_tolerances=None, is_strictly_positive=False,
@@ -33,27 +31,49 @@ class Signal(object):
         self.paths = paths
         self.machines = machines  # on which machines is the signal defined
         if causal_shifts is None:
-            causal_shifts = [0 for m in machines]
-        self.causal_shifts = causal_shifts  # causal shift in ms
+            self.causal_shifts = [0 for m in machines]
+        else:
+            self.causal_shifts = causal_shifts  # causal shift in ms
         self.is_ip = is_ip
         self.num_channels = 1
         self.normalize = normalize
         if data_avail_tolerances is None:
             data_avail_tolerances = [0 for m in machines]
         self.data_avail_tolerances = data_avail_tolerances
-        self.is_strictly_positive = is_strictly_positive
+        self.is_strictly_positive = is_strictly_positive        # True if signal is strictl positive
         self.mapping_paths = mapping_paths
 
     def is_strictly_positive_fn(self):
+        raise DepreciationWarning("use signal.is_strictly_positive")
+
         return self.is_strictly_positive
 
     def is_ip(self):
+        raise DepreciationWarning("use signal.is_ip")
+
         return self.is_ip
 
     def get_file_path(self, prepath, machine, shot_number):
+        """Loads signal for given machine and shot number.
+    
+        Input:
+        ======
+        prepath......: string, Base path, conf['paths']['base_path']
+        machine......: machine, Type of machine (D3D, NSTX, Jet...)
+        shot_number..: int, Unique shot identifier
+
+        Output:
+        =======
+        ???
+
+        Constructs the filename for a signal. Format:
+        prepath/machine.name/signal.dirname/shot_numbera
+        """
+
         dirname = self.get_path(machine)
-        return get_individual_shot_file(prepath + '/' + machine.name + '/'
-                                        + dirname + '/', shot_number)
+        return get_individual_shot_file(join(prepath, 
+                                             machine.name, 
+                                             dirname), shot_number)
 
     def is_valid(self, prepath, shot, dtype='float32'):
         t, data, exists = self.load_data(prepath, shot, dtype)
@@ -61,10 +81,24 @@ class Signal(object):
 
     def is_saved(self, prepath, shot):
         file_path = self.get_file_path(prepath, shot.machine, shot.number)
-        print(file_path)
-        return os.path.isfile(file_path)
+        return isfile(file_path)
 
     def load_data_from_txt_safe(self, prepath, shot, dtype='float32'):
+        """Safely load signal data from a stored txt file.
+
+
+        Input:
+        ======
+        prepath..:  
+        shot.....:
+        dtype....:
+
+
+        Output:
+        ======= 
+        data.....: ndarray(float) Signal data 
+
+        """
         file_path = self.get_file_path(prepath, shot.machine, shot.number)
         if not self.is_saved(prepath, shot):
             print('Signal {} , shot {} was never downloaded'.format(
@@ -74,7 +108,7 @@ class Signal(object):
         if os.path.getsize(file_path) == 0:
             print('Signal {}, shot {} '.format(self.description, shot.number),
                   'was downloaded incorrectly (empty file). Removing.')
-            os.remove(file_path)
+            remove(file_path)
             return None, False
         try:
             data = np.loadtxt(file_path, dtype=dtype)
@@ -86,7 +120,7 @@ class Signal(object):
             print(e)
             print('Couldnt load signal {} shot {}. Removing.'.format(
                 file_path, shot.number))
-            os.remove(file_path)
+            remove(file_path)
             return None, False
 
         return data, True
