@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-from os.path import join
+from os import listdir, stat
+from os.path import join, isfile, isdir
 import yaml
-import getpass
 
 from plasma.primitives.shots import ShotListFiles
 import plasma.data.signals as sig
@@ -13,26 +13,67 @@ from plasma.models.targets import (
     TTDTarget, TTDInvTarget, TTDLinearTarget
     )
 
+import logging
+
 
 def parse_config(input_file):
     """Parse yaml file of configuration parameters."""
     with open(input_file, 'r') as yaml_file:
         params = yaml.load(yaml_file, Loader=yaml.SafeLoader)
 
-        # Sets base path for all output
-        params["paths"]["base_path"] = join(params['fs_path'], getpass.getuser())
+        # Sets base path for all output.
+        # All paths, including
+        # * signal_prepath
+        # * shot_list_dir
+        # * ...
+        # are relative to this path
+        try: 
+            stat(params["paths"]["base_path"])
+            logging.info(f"Using base path {params['paths']['base_path']}")
+        except FileNotFoundError as err:
+            logging.error(f"Can not use {params['paths']['base_path']} as base_path: {err}")
+            raise FileNotFoundError
 
+        # Set directory list for signal_prepath
+        # paths.signal_prepath is a list of directories that will be searched for data
         if isinstance(params['paths']['signal_prepath'], list):
-            print('reading from multiple data folder!**********************************************')
-            params['paths']['signal_prepath'] = [join(params["paths"]["base_path"], s) 
-                    for s in params['paths']['signal_prepath']]
+            # Assemble a list of directories that will be sourced for data
+            prepath_list = []
+            for path in [join(params['paths']['base_path'], pp) for pp in params['paths']['signal_prepath']]:
+                try:
+                    stat(path)
+                    prepath_list.append(join(params["paths"]["base_path"], path))
+                    logging.info(f"Adding data directory {join(params['paths']['base_path'], path)}")
+                except FileNotFoundError as err:
+                    logging.error(f"Can't use {path} for signal_prepath: {err}")
+
         else:
-            params['paths']['signal_prepath'] = \
-                    join(params["paths"]["base_path"], 
-                         params['paths']['signal_prepath'])
-        params['paths']['shot_list_dir'] = \
-                join(params["paths"]["base_path"], 
-                     params['paths']['shot_list_dir'])
+            # Do the same, but only for the single directory given
+            path = join(params["paths"]["base_path"], params["paths"]["signal_prepath"])
+            try:
+                stat(path)
+                prepath_list = [path]
+                prepath_list.append(path)
+                logging.info(f"Adding data directory {path}")
+            except FileNotFoundError as err:
+                logging.error(f"Can't use {path} for signal_prepath: {err}")
+
+        if(len(prepath_list) == 0):
+            raise ValueError("len(prepath_list) == 0")
+
+        params["paths"]["signal_prepath"] = prepath_list
+
+        # Set directory for shot_list_dir
+        try:
+            path = join(params["paths"]["base_path"], params['paths']['shot_list_dir'])
+
+            stat(path)
+            params['paths']['shot_list_dir'] = path
+        except FileNotFoundError as err:
+            logging.error(err)
+            raise err
+            
+
 
         if params['paths']['data']=='d3d_data_gar18':
            h = myhash_signals(sig.all_signals_gar18.values())
@@ -61,6 +102,8 @@ def parse_config(input_file):
         else:   
            h = myhash_signals(sig.all_signals.values())#+params['data']['T_min_warn'])
 
+        logging.info(f"Hash used: {h}")
+
         
         params['paths']['global_normalizer_path'] = join(params["paths"]["base_path"], 
                 f"/normalization/normalization_signal_group_{h}.npz")
@@ -80,8 +123,8 @@ def parse_config(input_file):
             params['paths']['results_prepath'] =  join(params["paths"]["base_path"], "results")
 
         params['paths']['saved_shotlist_path'] = join(params["paths"]["base_path"],
-                "processed_shotlists_torch")
-        params['paths']['base_path'] + "processed_shotlists_torch"
+                                                      "processed_shotlists_torch")
+        #params['paths']['base_path'] + "processed_shotlists_torch"
             #params['paths']['base_path'] + '/../FRNN/gdong-temp/processed_shotlists_torch/'
             #+ params['paths']['data']
             #+ '/shot_lists_signal_group_{}.npz'.format(h))

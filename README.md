@@ -45,3 +45,13 @@ optionally add `--user` to install in a home directory.
 ## Tutorials
 
 For a tutorial, check out: [PrincetonUTutorial.md](docs/PrincetonUTutorial.md)
+
+
+## Breaking Change introduced by ELMs branch
+
+* The base path for all signals is now `paths.base_path`. This path is directly specified in
+  `conf.yaml`
+
+
+
+

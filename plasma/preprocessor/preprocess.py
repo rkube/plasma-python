@@ -30,27 +30,52 @@ class Preprocessor(object):
         self.conf = conf
         self.verbose = verbose
 
-    def clean_shot_lists(self):
-        """Cleans a list of shot directories."""
+    def format_shot_lists(self):
+        """Call format_shotlist_twocolumn on a list of shot-lists."""
       
-        # Iterate over a list of all files located in conf['paths']['shot_list_dir']
-        for path in [join(self.conf['paths']['shot_list_dir'], f) for f in listdir(shot_list_dir)]:
-            if isfile(path):
-                # Call clean_shot_list for each of these files
-                self.clean_shot_list(path)
+        # Iterate over a list of all directories located in conf['paths']['shot_list_dir']
 
-    def clean_shot_list(self, path):
-        # 
-        data = np.loadtxt(path)
-        # ending_idx = path.rfind('.')
-        new_path = append_to_filename(path, '_clear')
+        paths = [join(shot_list_dir, f) for f in listdir(shot_list_dir) if isfile(join(shot_list_dir, f))]
+        for path in paths
+            logging.info(f"Cleaning shot list {path}")
+            # Call clean_shot_list for each of these files
+            self.clean_shot_list(path)
+
+    def format_shotlist(self, path):
+        """Re-format a shotlist into two columns.
+
+        Input:
+        ------
+        path:........str(filename) Data file name 
+
+
+        Output:
+        -------
+        None
+
+
+        Shotlists are in two-column format:
+        Shotnr   Tdisrupt
+        ======   ========
+
+        Non-disruptive shots have only one column of data. In this case we overwrite
+        the datafile with an appended column of -1.
+        """
+        
+        try:
+            data = np.loadtxt(path)
+        except OSError as err:
+            logging.error(f"Can't clean shot list for path {path}: {err}. Exiting")
+            raise OSError(err)
+
         if len(np.shape(data)) < 2:
             # nondisruptive
-            nd_times = -1.0*np.ones_like(data)
+            new_path = append_to_filename(path, '_clear')
+            nd_times = -1.0 * np.ones_like(data)
             data_two_column = np.vstack((data, nd_times)).transpose()
             np.savetxt(new_path, data_two_column, fmt='%d %f')
-            print('created new file: {}'.format(new_path))
-            print('deleting old file: {}'.format(path))
+
+            logging.info("format_shotlist: renaming {path} -> {new_path}")
             os.remove(path)
 
     def all_are_preprocessed(self):
