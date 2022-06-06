@@ -8,12 +8,10 @@ This work was supported by the DOE CSGF program.
 #########################################################
 '''
 
-#from __future__ import print_function
-#import plasma.global_vars as g
-from os import listdir  # , remove
 import time
 import sys
-import os
+from os import remove, listdir
+from os.path import join, isfile
 
 import numpy as np
 import multiprocessing as mp
@@ -22,24 +20,24 @@ from plasma.utils.processing import append_to_filename
 from plasma.primitives.shots import ShotList
 from plasma.utils.downloading import mkdirdepth
 
-
+import logging
 
 
 class Preprocessor(object):
-    """Preprocessor class. Does ???."""
-    def __init__(self, conf):
+    """Preprocessor class. """
+    def __init__(self, conf, verbose=False):
         """Initializes by storing a copy of the configuration"""
         self.conf = conf
+        self.verbose = verbose
 
     def clean_shot_lists(self):
         """Cleans a list of shot directories."""
       
         # Iterate over a list of all files located in conf['paths']['shot_list_dir']
-        for path in [os.path.join(self.conf['paths']['shot_list_dir'], f) for f in
-                     listdir(shot_list_dir) if
-                     os.path.isfile(os.path.join(self.conf['paths']['shot_list_dir'], f))]
-            # Call clean_shot_list for each of these files
-            self.clean_shot_list(path)
+        for path in [join(self.conf['paths']['shot_list_dir'], f) for f in listdir(shot_list_dir)]:
+            if isfile(path):
+                # Call clean_shot_list for each of these files
+                self.clean_shot_list(path)
 
     def clean_shot_list(self, path):
         # 

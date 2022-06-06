@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+
+print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+print("+++++LEGACY CODE!!! DO NOT IMPORT+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
 from plasma.conf_parser import parameters
 import os
 import errno
@@ -20,3 +26,5 @@ elif os.path.exists('./conf.yaml'):
 #else:
 #    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
 #                            'conf.yaml')
+
+# End of file conf.py
