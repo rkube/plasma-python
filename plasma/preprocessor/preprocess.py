@@ -37,9 +37,8 @@ class Preprocessor(object):
 
         paths = [join(shot_list_dir, f) for f in listdir(shot_list_dir) if isfile(join(shot_list_dir, f))]
         for path in paths
-            logging.info(f"Cleaning shot list {path}")
             # Call clean_shot_list for each of these files
-            self.clean_shot_list(path)
+            self.format_shot_list(path)
 
     def format_shotlist(self, path):
         """Re-format a shotlist into two columns.
@@ -68,6 +67,7 @@ class Preprocessor(object):
             logging.error(f"Can't clean shot list for path {path}: {err}. Exiting")
             raise OSError(err)
 
+        logging.info(f"Formatting shot list {path}")
         if len(np.shape(data)) < 2:
             # nondisruptive
             new_path = append_to_filename(path, '_clear')
@@ -78,36 +78,32 @@ class Preprocessor(object):
             logging.info("format_shotlist: renaming {path} -> {new_path}")
             os.remove(path)
 
-    def all_are_preprocessed(self):
-        return os.path.isfile(self.get_shot_list_path())
 
     def preprocess_all(self):
-        conf = self.conf
-        shot_files_all = conf['paths']['shot_files_all']
-        # shot_files_train = conf['paths']['shot_files']
-        # shot_files_test = conf['paths']['shot_files_test']
-        # shot_list_dir = conf['paths']['shot_list_dir']
-        use_shots = conf['data']['use_shots']
-        # train_frac = conf['training']['train_frac']
-        # use_shots_train = int(round(train_frac*use_shots))
-        # use_shots_test = int(round((1-train_frac)*use_shots))
-        #        print(use_shots_train)
-        #        print(use_shots_test) #each print out 100,000
-
-        # if len(shot_files_test) > 0:
-        #     return
-        #     self.preprocess_from_files(shot_list_dir,shot_files_train,
-        #      machines_train,use_shots_train)
-        #     + self.preprocess_from_files(shot_list_dir,
-        #      shot_files_test,machines_train,use_shots_test)
-        # else:
-        return self.preprocess_from_files(shot_files_all, use_shots)
-
+        """TODO: Deprecated."""
+        logging.error("Preprocess.preprocess_all is deprecated.")
+        err_str = "Preprocess.preprocess_all is deprecated. \n Call instead: \n>"
+        err_str  += "'preprocess_from_files(conf['paths']['shot_files_all'], conf['data']['use_shots'])'"
+        raise DeprecationWarning(err_str)
     def preprocess_from_files(self, shot_files, use_shots):
-        # all shots, including invalid ones
-        all_signals = self.conf['paths']['all_signals']
+        """Distribute preprocessing of all signals across process pool.
+
+
+        Input:
+        ======
+        shot_files...
+        use_shots....
+
+
+        Output:
+        =======
+        used_shots...
+
+
+        """
+        # New shot list
         shot_list = ShotList()
-        shot_list.load_from_shot_list_files_objects(shot_files, all_signals)
+        shot_list.load_from_shot_list_files_objects(shot_files, self.conf["paths"]["all_signals"])
         shot_list_picked = shot_list.random_sublist(use_shots)
 
         # empty
@@ -161,14 +157,17 @@ class Preprocessor(object):
         return shot
 
     def get_individual_channel_dirs(self):
-        return self.conf['paths']['signals_dirs']
+        raise DepreciationWarning("replace get_individual_channel_dirs() is conf['paths'][signal_dirs']")
+        #return self.conf['paths']['signals_dirs']
 
     def get_shot_list_path(self):
-        return self.conf['paths']['saved_shotlist_path']
+        raise DepreciationWarning("replace get_shot_list_path() is conf['paths']['saved_shotlist_path']")
+        #return self.conf['paths']['saved_shotlist_path']
 
     def load_shotlists(self):
         path = self.get_shot_list_path()
-        data = np.load(path, encoding="latin1", allow_pickle=True)
+        data = np.load(self.conf["paths"]["saved_shotlist_path"], 
+                       encoding="utf8", allow_pickle=True)
         shot_list_train = data['shot_list_train'][()]
         shot_list_validate = data['shot_list_validate'][()]
         shot_list_test = data['shot_list_test'][()]
@@ -262,15 +261,16 @@ def apply_bleed_in(conf, shot_list_train, shot_list_validate, shot_list_test):
 
 def guarantee_preprocessed(conf, verbose=False):
     pp = Preprocessor(conf)
-    if pp.all_are_preprocessed():
-        if verbose:
-            g.print_unique("shots already processed.")
-        (shot_list_train, shot_list_validate,
-         shot_list_test) = pp.load_shotlists()
+    
+    # TODO: replace function with definitino here
+    #def all_are_preprocessed(self):
+    #    return os.path.isfile(self.get_shot_list_path())
+    if os.path.isfile(self.get_shot_list_path())
+        logging.info(f"{self.get_shot_list_path()} exists. Skipping preprocessing")
+        shot_list_train, shot_list_validate, shot_list_test = pp.load_shotlists()
     else:
-        if verbose:
-            g.print_unique("preprocessing all shots...")  # , end='')
-        pp.clean_shot_lists()
+        logging.info("Formatting shots....")
+        pp.format_shot_lists()
         shot_list = pp.preprocess_all()
         shot_list.sort()
         shot_list_train, shot_list_test = shot_list.split_train_test(conf)

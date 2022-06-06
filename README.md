@@ -52,6 +52,8 @@ For a tutorial, check out: [PrincetonUTutorial.md](docs/PrincetonUTutorial.md)
 * The base path for all signals is now `paths.base_path`. This path is directly specified in
   `conf.yaml`
 
+* Renaming clean_shot_list to format_shotlist in Preprocessing
 
+* Removed Preprocess.all_are_preprocessed (one-liner that was called in one line)
 
 

@@ -13,16 +13,13 @@ import os
 import os.path
 import sys
 import random as rnd
+
 import numpy as np
 
-from plasma.utils.processing import (
-    train_test_split, cut_and_resample_signal,
-    get_individual_shot_file
-    )
-from plasma.utils.downloading import makedirs_process_safe
-from plasma.utils.hashing import myhash
-
-
+from processing import train_test_split, cut_and_resample_signal
+from downloading import makedirs_process_safe
+from find_elms import *
+from find_rational import *
 class ShotListFiles(object):
     def __init__(self, machine, prepath, paths, description=''):
         self.machine = machine
@@ -39,8 +36,11 @@ class ShotListFiles(object):
         return self.__str__()
 
     def get_single_shot_numbers_and_disruption_times(self, full_path):
-        data = np.loadtxt(full_path, ndmin=1, dtype={
-            'names': ('num', 'disrupt_times'), 'formats': ('i4', 'f4')})
+        data = np.loadtxt(
+            full_path, ndmin=1, dtype={
+                'names': (
+                    'num', 'disrupt_times'), 'formats': (
+                    'i4', 'f4')})
         shots = np.array(list(zip(*data))[0])
         disrupt_times = np.array(list(zip(*data))[1])
         return shots, disrupt_times
@@ -74,21 +74,24 @@ class ShotList(object):
         '''
         self.shots = []
         if shots is not None:
-            assert all([isinstance(shot, Shot) for shot in shots])
+            assert(all([isinstance(shot, Shot) for shot in shots]))
             self.shots = [shot for shot in shots]
 
-    def load_from_shot_list_files_object(self, shot_list_files_object,
-                                         signals):
+    def load_from_shot_list_files_object(
+            self, shot_list_files_object, signals):
         machine = shot_list_files_object.machine
         shot_numbers, disruption_times = (
             shot_list_files_object.get_shot_numbers_and_disruption_times())
         for number, t in list(zip(shot_numbers, disruption_times)):
-            self.append(Shot(number=number, t_disrupt=t, machine=machine,
-                             signals=[s for s in signals if
-                                      s.is_defined_on_machine(machine)]))
+            self.append(
+                Shot(number=number, t_disrupt=t, machine=machine,
+                     signals=[s for s in signals if
+                              s.is_defined_on_machine(machine)]
+                     )
+                )
 
-    def load_from_shot_list_files_objects(self, shot_list_files_objects,
-                                          signals):
+    def load_from_shot_list_files_objects(
+            self, shot_list_files_objects, signals):
         for obj in shot_list_files_objects:
             self.load_from_shot_list_files_object(obj, signals)
 
@@ -100,17 +103,13 @@ class ShotList(object):
         shuffle_training = conf['training']['shuffle_training']
         use_shots = conf['data']['use_shots']
         all_signals = conf['paths']['all_signals']
-        # split "maximum number of shots to use" into:
-        # test vs. (train U validate)
+        # split randomly
         use_shots_train = int(round(train_frac*use_shots))
         use_shots_test = int(round((1-train_frac)*use_shots))
         if len(shot_files_test) == 0:
-            # split randomly, e.g. sample both sets from same distribution
-            # such as D3D test and train
             shot_list_train, shot_list_test = train_test_split(
                 self.shots, train_frac, shuffle_training)
-        # train and test list given, e.g. they are sampled from separate
-        # distributions such as train=CW and test=ILW for JET
+        # train and test list given
         else:
             shot_list_train = ShotList()
             shot_list_train.load_from_shot_list_files_objects(
@@ -122,6 +121,7 @@ class ShotList(object):
 
         shot_numbers_train = [shot.number for shot in shot_list_train]
         shot_numbers_test = [shot.number for shot in shot_list_test]
+        print(len(shot_numbers_train), len(shot_numbers_test))
         # make sure we only use pre-filtered valid shots
         shots_train = self.filter_by_number(shot_numbers_train)
         shots_test = self.filter_by_number(shot_numbers_test)
@@ -142,7 +142,7 @@ class ShotList(object):
         return new_shot_list
 
     def set_weights(self, weights):
-        assert len(weights) == len(self.shots)
+        assert(len(weights) == len(self.shots))
         for (i, w) in enumerate(weights):
             self.shots[i].weight = w
 
@@ -176,7 +176,6 @@ class ShotList(object):
         return self.sample_weighted_given_arr(p)
 
     def get_weights_d_nd(self):
-        # TODO(KGF): only called in above sample_equal_classes()
         num_total = len(self)
         num_d = self.num_disruptive()
         num_nd = num_total - num_d
@@ -247,13 +246,13 @@ class ShotList(object):
         return self.shots
 
     def append(self, shot):
-        assert isinstance(shot, Shot)
+        assert(isinstance(shot, Shot))
         self.shots.append(shot)
 
     def remove(self, shot):
-        assert shot in self.shots
+        assert(shot in self.shots)
         self.shots.remove(shot)
-        assert shot not in self.shots
+        assert(shot not in self.shots)
 
     def make_light(self):
         for shot in self.shots:
@@ -264,7 +263,7 @@ class ShotList(object):
             self.append(shot)
             return True
         else:
-            # print('Warning: shot {} not valid [omit]'.format(shot.number))
+            # print('Warning: shot {} not valid, omitting'.format(shot.number))
             return False
 
 
@@ -276,25 +275,30 @@ class Shot(object):
 
     For 0D data, each shot is modeled as a 2D Numpy array - time vs a plasma
     property.
-
-    Attributes:
-        number (int): Unique identifier of a shot.
-        t_disrupt (float): Disruption time in milliseconds (second column in
-            the shotlist input file).
-        ttd: Numpy array of doubles, time profile of the shot converted to
-            time-to-disruption values.
-        valid (bool): Flag indicating whether plasma property
-          (specifically, current) reaches a certain value during the shot.
-        is_disruptive (bool): Flag indicating whether a shot is disruptive.
-
     '''
 
-    def __init__(self, number=None, machine=None, signals=None,
-                 signals_dict=None, ttd=None, valid=None, is_disruptive=None,
-                 t_disrupt=None):
+    def __init__(
+            self,
+            number=None,
+            machine=None,
+            signals=None,
+            signals_dict=None,
+            ttd=None,
+            valid=None,
+            is_disruptive=None,
+            t_disrupt=None):
         '''
         Shot objects contain following attributes:
 
+         - number: integer, unique identifier of a shot
+         - t_disrupt: double, disruption time in milliseconds (second column in
+         the shotlist input file)
+
+         - ttd: Numpy array of doubles, time profile of the shot converted to
+           time-to-disruption values
+         - valid: boolean flag indicating whether plasma property
+           (specifically, current) reaches a certain value during the shot
+         - is_disruptive: boolean flag indicating whether a shot is disruptive
         '''
         self.number = number  # Shot number
         self.machine = machine  # machine on which it is defined
@@ -323,7 +327,11 @@ class Shot(object):
         return self.get_id_str().__eq__(other.get_id_str())
 
     def __hash__(self):
-        return myhash(self.get_id_str())
+        import hashlib
+        return int(
+            hashlib.md5(
+                self.get_id_str().encode('utf-8')).hexdigest(),
+            16)
 
     def __str__(self):
         string = 'number: {}\n'.format(self.number)
@@ -339,7 +347,6 @@ class Shot(object):
     def num_timesteps(self, prepath):
         self.restore(prepath)
         ts = self.ttd.shape[0]
-        # TODO(KGF): Clears ttd array and arrays in signals_dict; why do this??
         self.make_light()
         return ts
 
@@ -367,6 +374,111 @@ class Shot(object):
             curr_idx += sig.num_channels
         return t_array, signal_array
 
+    def get_data_arrays_lmtarget(self, use_signals, dtype='float32',predict_mode='shift_target',predict_time=0,target_description='Locked mode amplitude'):
+        def derivative_lm(arr):
+            if len(arr)<3:
+               return arr
+            else:
+               res=[0]
+               for i in range(1,len(arr)):
+                 res.append(arr[i]-arr[i-1])
+               return np.array(res)
+        def derivative_lm_norm(arr):
+            if len(arr)<3:
+               return arr
+            else:
+               res=[0]
+               for i in range(1,len(arr)):
+                 res.append((arr[i]-arr[i-1])/(arr[i-1]+0.01))
+               return np.array(res)
+        def ttelm(arr):
+            if len(arr)<3:
+                return [10,10,10]
+            else:
+                _,tar = find_elm_events_tar(np.arange(0,len(arr)),arr)
+                cutting_time = 100
+                tar[np.argwhere(tar>cutting_time)] = cutting_time
+                tar = tar*0.1
+            return tar
+
+        def smooth_lm(arr,window=50):
+             #print('smooth_lm_arr_shape:',arr.shape,arr[0])
+             window=window//2
+             if len(arr)==0:
+                return []
+             pad=[]
+             for i in range(window):
+                 pad.append(arr[0])
+             pad=np.array(pad)
+             arr_pad=np.concatenate((np.array(pad),arr))
+             arr_pad=np.concatenate((arr_pad,np.array([arr[-1]]*window)))
+             ress=[]
+             for i in range(window,len(arr)+window):
+                ress.append(sum(arr_pad[i-window:i+window])/(window*2))
+             return np.array(ress)
+
+        predict_time=predict_time+1
+        t_array = self.ttd
+        signal_array = np.zeros(
+            (len(t_array), sum([sig.num_channels for sig in use_signals])+2*128),
+            dtype=dtype)
+        curr_idx = 0
+        lm=self.ttd
+        res=[]
+        for sig in self.signals:
+            if sig.description in target_description and len(t_array)>predict_time:
+               #print('TargetDescription:',target_description) 
+               #print(len(t_array),predict_time)
+               lm=self.ttd.copy()
+               lm[:-predict_time]=np.reshape(self.signals_dict[sig][predict_time:],(-1))
+               lm[-predict_time:]=self.signals_dict[sig][-predict_time][0]
+               res.append(lm)
+        #       self.signals_dict[sig]=0.0
+            if sig in use_signals:
+              signal_array[:, curr_idx:curr_idx
+                         + sig.num_channels] = self.signals_dict[sig]
+              curr_idx += sig.num_channels
+              if sig.description == "q profile efitrt1":
+                print(self.number)
+                n_mode,m_mode = get_rational(self.signals_dict[sig],self.number,saving = True)
+                signal_array[:, curr_idx:curr_idx
+                         + sig.num_channels] = n_mode
+                curr_idx += sig.num_channels
+                signal_array[:, curr_idx:curr_idx
+                         + sig.num_channels] = m_mode
+                curr_idx += sig.num_channels
+
+           #   else:
+           #     signal_array[:, curr_idx:curr_idx
+           #              + sig.num_channels] = self.signals_dict[sig]
+
+        if predict_mode=='smooth_target':
+            for i in range(len(res)):
+                res[i]=smooth_lm(res[i],window=50)
+        if predict_mode=='derivative_target':
+            for i in range(len(res)):
+                res[i]=derivative_lm(res[i])
+        if predict_mode=='derivative_target_norm':
+            for i in range(len(res)):
+                res[i]=derivative_lm_norm(res[i])
+        if predict_mode=='ttelm_target':
+            for i in range(len(res)):
+                res[i]=ttelm(res[i])
+        return np.transpose(np.array(res)), signal_array
+
+
+    def get_data_arrays_contaminate(self,use_signals,dtype='float32',contaminate_description=None,cvalue=0.0):
+        t_array = self.ttd
+        signal_array = np.zeros((len(t_array),sum([sig.num_channels for sig in use_signals])),dtype=dtype)
+        curr_idx = 0
+        for sig in use_signals:
+            signal_array[:,curr_idx:curr_idx+sig.num_channels] = self.signals_dict[sig]
+            if sig.description==contaminate_description:
+              print('Contaminating ',sig.description,'..Artificially.............................')
+              signal_array[:,curr_idx:curr_idx+sig.num_channels] = cvalue
+
+            curr_idx += sig.num_channels
+        return t_array,signal_array
     def get_individual_signal_arrays(self):
         # guarantee ordering
         return [self.signals_dict[sig] for sig in self.signals]
@@ -378,10 +490,15 @@ class Shot(object):
         time_arrays, signal_arrays, t_min, t_max, valid = (
             self.get_signals_and_times_from_file(conf))
         self.valid = valid
+        print('shot NUMBER',self.number,'valid==' ,valid,'......................')
         # cut and resample
-        if self.valid:
-            self.cut_and_resample_signals(
-                time_arrays, signal_arrays, t_min, t_max, conf)
+        if self.valid == True:
+            try:
+                self.cut_and_resample_signals(
+                   time_arrays, signal_arrays, t_min, t_max, conf)
+            except:
+                self.valid=False
+
 
     def get_signals_and_times_from_file(self, conf):
         valid = True
@@ -390,135 +507,126 @@ class Shot(object):
         # t_thresh = -1
         signal_arrays = []
         time_arrays = []
-        garbage = False
+        garbage=False
         # disruptive = self.t_disrupt >= 0
-        # TODO(KGF): refactor the dataset-specific shot filtering settings
-        # (expose in conf.yaml?)
-        if conf['paths']['data'] == 'd3d_data_garbage':
-            garbage = True
-        invalid_signals = 0
+        if conf['paths']['data'] =='d3d_data_garbage':
+            garbage=True
+        elif conf['paths']['data'] == 'd3d_data_n1rms_gar' :
+            garbage=True
+        non_valid_signals=0
         signal_prepath = conf['paths']['signal_prepath']
-        # TODO(KGF): check the purpose of the following D3D-specific lines
-        # added from fork in Dec 2019. Add [omit] print?
-        # --- possibly corrupted raw shot files from original D3D shot set
-        # if self.number in [127613, 129423, 125726, 126662]:
-        #     return None, None, None, None, False
+        if self.number in [127613,129423,125726,126662,165910,138821]:
+             return None, None, None, None, False
         for (i, signal) in enumerate(self.signals):
-            if isinstance(signal_prepath, list):
-                for prepath in signal_prepath:
-                    t, sig, valid_signal = signal.load_data(
-                        prepath, self, conf['data']['floatx'])
-                    if valid_signal:
-                        break
-            else:
+            if isinstance(signal_prepath,list):
+              for prepath in signal_prepath:
                 t, sig, valid_signal = signal.load_data(
-                    signal_prepath, self, conf['data']['floatx'])
-            if not valid_signal:
-                # TODO(KGF): new check added from fork in Dec 2019.
-                # Add [omit] print?
-                if (signal.is_ip or 'q95' in signal.description
-                        or garbage is False or sig is None):
-                    # Exclude entire shot if missing plasma current or q95
-                    return None, None, None, None, False
-                else:
-                    t = np.arange(0, 20, 0.001)
-                    sig = np.zeros((t.shape[0], sig[1]))
-                    invalid_signals += 1
-                    signal_arrays.append(sig)
-                    time_arrays.append(t)
+                prepath, self, conf['data']['floatx'])
+                if valid_signal:
+                   break
             else:
-                assert len(sig.shape) == 2
-                assert len(t.shape) == 1
-                assert len(t) > 1
+              t, sig, valid_signal = signal.load_data(
+                signal_prepath, self, conf['data']['floatx'])
+            if not valid_signal:
+                if signal.is_ip or ('n1' in signal.description) or garbage==False or sig==None:
+                   ########################Not allow a shot if it is missing plasma current information, or q95 is missing 
+                   return None, None, None, None, False
+                else:
+                   t=np.arange(0,20,0.001)
+                   sig=np.zeros((t.shape[0],sig[1]))
+                   non_valid_signals+=1
+                   signal_arrays.append(sig)
+                   time_arrays.append(t)
+            else:
+                assert(len(sig.shape) == 2)
+                assert(len(t.shape) == 1)
+                assert(len(t) > 1)
                 t_min = max(t_min, np.min(t))
                 signal_arrays.append(sig)
                 time_arrays.append(t)
-
+                
                 if self.is_disruptive and self.t_disrupt > np.max(t):
-                    tol = signal.get_data_avail_tolerance(self.machine)
-                    t_max_total = np.max(t) + tol
-                    if self.t_disrupt > t_max_total:
-                        if garbage is False:
-                            print('Shot {}: disruption event '.format(
-                                self.number),
-                                  'is not contained in valid time region of ',
-                                  'signal {} by {}s [omit]'.format(
-                                      self.number, signal,
-                                      self.t_disrupt - np.max(t)))
+                    t_max_total = (
+                        np.max(t) + signal.get_data_avail_tolerance(
+                            self.machine)
+                    )
+                    if (self.t_disrupt > t_max_total):
+                        if garbage==False:
+                            print('Shot {}: disruption event '.format(self.number),
+                              'is not contained in valid time region of ',
+                              'signal {} by {}s, omitting.'.format(
+                                  self.number, signal,
+                                  self.t_disrupt - np.max(t)))
                             valid = False
                         else:
-                            # Set the entire channel to zero to prevent any
-                            # peeking into possible disruptions from this early
-                            # terminated channel
-                            invalid_signals += 1
-                            t = np.arange(0, 20, 0.001)
-                            sig = np.zeros((t.shape[0], sig.shape[1]))
+                            non_valid_signals+=1
+                            t=np.arange(0,20,0.001)
+                            sig=np.zeros((t.shape[0],sig.shape[1]))
+                            #Setting the entire channel to zero to prevent any peeking into possible disruptions from this early ended channel
                     else:
-                        t_max = np.max(t) + tol
+                        t_max = np.max(
+                            t) + signal.get_data_avail_tolerance(self.machine)
                 else:
                     t_max = min(t_max, np.max(t))
 
-        # make sure the shot is long enough. E.g. for typical dt=0.001,
-        # T_min_warn=30, and length=128, pulse length must >= 286 ms
-        # TODO(KGF): expose this hardcoded setting and/or document
+        # make sure the shot is long enough.
         dt = conf['data']['dt']
-        if (t_max - t_min)/dt <= (2*conf['model']['length']
-                                  + conf['data']['T_min_warn']):
-            print('Shot {} contains insufficient data [omit]'.format(
-                self.number))
+        if (t_max - t_min)/dt <= (2*conf['model']
+                                  ['length']+conf['data']['T_min_warn']):
+            print(
+                'Shot {} contains insufficient data, omitting.'.format(
+                    self.number))
             valid = False
 
-        assert t_max > t_min or not valid, (
-            "t max: {}, t_min: {}".format(t_max, t_min))
+        assert(
+            t_max > t_min or not valid), "t max: {}, t_min: {}".format(
+            t_max, t_min)
 
         if self.is_disruptive:
-            assert self.t_disrupt <= t_max or not valid
+            assert(self.t_disrupt <= t_max or not valid)
             t_max = self.t_disrupt
-        if invalid_signals > 3:
-            # Omit shot if more than 3 channels are bad
-            print('Shot {}: has more than 3 invalid channels [omit]'.format(
-                self.number))
-            valid = False
-        # if the signal has np.max(t) < t_disrupt, but t_max_total (with
-        # positive tolerance) > t_disrupt, then the signal is implicitly
-        # padded with 0's
+        if non_valid_signals>2:
+            print('Shot {}:  '.format(self.number),
+                              'is REALLY garbabge (>=3 channels are contaminated......) ')
+
+            #Omit a shot if more than 3 channels are bad channels....
+            valid=False
+
         return time_arrays, signal_arrays, t_min, t_max, valid
 
-    def cut_and_resample_signals(self, time_arrays, signal_arrays, t_min,
-                                 t_max, conf):
+    def cut_and_resample_signals(
+            self,
+            time_arrays,
+            signal_arrays,
+            t_min,
+            t_max,
+            conf):
         dt = conf['data']['dt']
         signals_dict = dict()
-
+        print('resampling..',self.number)
         # resample signals
-        assert len(signal_arrays) == len(time_arrays) == len(self.signals)
-        assert len(signal_arrays) > 0
-        t_resampled = 0
+        assert((len(signal_arrays) == len(time_arrays)
+                == len(self.signals)) and len(signal_arrays) > 0)
+        tr = 0
         for (i, signal) in enumerate(self.signals):
-            t_resampled, sigr = cut_and_resample_signal(
+            print(signal)
+            tr, sigr = cut_and_resample_signal(
                 time_arrays[i], signal_arrays[i], t_min, t_max, dt,
                 conf['data']['floatx'])
             signals_dict[signal] = sigr
 
-        ttd = self.convert_to_ttd(t_resampled, conf)
+        ttd = self.convert_to_ttd(tr, conf)
         self.signals_dict = signals_dict
         self.ttd = ttd
 
-    def convert_to_ttd(self, T, conf):
-        """
-        Reverse pulse time by computing time-to-disruption.
-
-        This is the only part of the code that uses input hyperparameter
-        T_max.
-        """
-
+    def convert_to_ttd(self, tr, conf):
         T_max = conf['data']['T_max']
         dt = conf['data']['dt']
         if self.is_disruptive:
-            ttd = max(T) - T
+            ttd = max(tr) - tr
             ttd = np.clip(ttd, 0, T_max)
         else:
-            ttd = T_max*np.ones_like(T)
-        #
+            ttd = T_max*np.ones_like(tr)
         ttd = np.log10(ttd + 1.0*dt/10)
         return ttd
 
@@ -530,8 +638,7 @@ class Shot(object):
         print('...saved shot {}'.format(self.number))
 
     def get_save_path(self, prepath):
-        return get_individual_shot_file(prepath, self.machine, self.number,
-                                        ext='.npz')
+        return get_individual_shot_file(prepath, self.number, '.npz')
 
     def restore(self, prepath, light=False):
         assert self.previously_saved(prepath), 'shot was never saved'
@@ -559,3 +666,9 @@ class Shot(object):
     @staticmethod
     def is_disruptive_given_disruption_time(t):
         return t >= 0
+
+# it used to be in utilities, but can't import globals in multiprocessing
+
+
+def get_individual_shot_file(prepath, shot_num, ext='.txt'):
+    return prepath + str(shot_num) + ext
