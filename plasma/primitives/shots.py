@@ -9,9 +9,7 @@ This work was supported by the DOE CSGF program.
 '''
 
 import os
-import os.path
-import sys
-import random as rnd
+import random 
 
 import numpy as np
 import logging
@@ -22,23 +20,43 @@ from plasma.utils.find_elms import *
 from plasma.utils.find_rational import *
 
 class ShotListFiles(object):
-    def __init__(self, machine, prepath, paths, description=''):
+    """Representation of a list of shot files."""
+    def __init__(self, machine, basepath, filelist, description=None):
+        """Initializes the object.
+
+        Input:
+        ======
+        machine......: machine, type of tokamak device
+        basepath.....: Absolute path where the shot lists are located
+        filelist.....: List of shots
+        description..:
+
+        Output:
+        =======
+        """
         self.machine = machine
-        self.prepath = prepath
-        self.paths = paths
+        self.basepath = basepath
+        self.filelist = filelist
         self.description = description
 
+        # Ensure that all files exist in basepath
+        for fname in filelist:
+            try:
+                os.stat(os.path.join(basepath, fname))
+            except OSError as err:
+                logging.error(f"ShotListFiles: file{os.path.join(basepath, fname)} does not exist. Exiting")
+                raise(err)
+
+        logging.info(f"ShotListFiles.__init__: machine={self.machine}, prepath={self.prepath}, paths={self.paths}, description={self.description}")
+
     def __str__(self):
-        s = 'machine: ' + self.machine.__str__()
-        s += '\n' + self.description
-        return s
+        return f"machine: {self.machine.__str__}\n {self.description}"
 
     def __repr__(self):
         return self.__str__()
 
     def get_single_shot_numbers_and_disruption_times(self, full_path):
-        data = np.loadtxt(
-            full_path, ndmin=1, dtype={
+        data = np.loadtxt(full_path, ndmin=1, dtype={
                 'names': (
                     'num', 'disrupt_times'), 'formats': (
                     'i4', 'f4')})
@@ -50,8 +68,8 @@ class ShotListFiles(object):
         all_shots = []
         all_disruption_times = []
         # all_machines_arr = []
-        for path in self.paths:
-            full_path = self.prepath + path
+        for fname in self.filelist:
+            full_path = os.path.join(self.basepath, fname)
             shots, disruption_times = (
                 self.get_single_shot_numbers_and_disruption_times(full_path))
             all_shots.append(shots)
@@ -79,17 +97,24 @@ class ShotList(object):
             self.shots = [shot for shot in shots]
 
     def load_from_shot_list_files_object(self, shot_list_files_object, signals):
-        """Constructs a list of shot objects."""
-        machine = shot_list_files_object.machine
+        """Appends a shot_list to the list of shots.
+
+        Input:
+        ======
+        shot_list_files_object:
+        signals:
+
+        Output:
+        =======
+        None
+
+        """
+
+        print("Called load_from_shot_list_files_object: ", type(shot_list_files_object), shot_list_files_object)
         shot_numbers, disruption_times = shot_list_files_object.get_shot_numbers_and_disruption_times()
         for number, t in list(zip(shot_numbers, disruption_times)):
-            self.shots.append(Shot(number=number, t_disrupt=t, machine=machine,
+            self.shots.append(Shot(number=number, t_disrupt=t, machine=shot_list_files_object.machine,
                                    signals=[s for s in signals if s.is_defined_on_machine(machine)]))
-
-    def load_from_shot_list_files_objects(
-            self, shot_list_files_objects, signals):
-        for obj in shot_list_files_objects:
-            self.load_from_shot_list_files_object(obj, signals)
 
     def split_train_test(self, conf):
         # shot_list_dir = conf['paths']['shot_list_dir']
@@ -228,7 +253,7 @@ class ShotList(object):
         for i in range(0, len(self), num):
             subl = self.shots[i:i+num]
             while equal_size and len(subl) < num:
-                subl.append(rnd.choice(self.shots))
+                subl.append(random.choice(self.shots))
             lists.append(subl)
         return [ShotList(l) for l in lists]
 

@@ -103,7 +103,10 @@ class Preprocessor(object):
         """
         # New shot list
         shot_list = ShotList()
-        shot_list.load_from_shot_list_files_objects(shot_files, self.conf["paths"]["all_signals"])
+        # Add the shots to the shotlist object
+        for shot in shot_files:
+            shot_list.load_from_shot_list_files_object(shot, self.conf["paths"]["all_signals"])
+    
         shot_list_picked = shot_list.random_sublist(use_shots)
 
         # empty
@@ -273,9 +276,8 @@ def guarantee_preprocessed(conf, verbose=False):
         # Make sure the shot lists are properly formatted
         pp.format_shot_lists()
         # Preprocess all available shots
-        shot_list = pp.preprocess_all(conf["paths"]["shot_files_all"], conf["data"]["use_shots"])
-
-        #shot_list = pp.preprocess_all()
+        logging.info("Preprocessing from files...")
+        shot_list = pp.preprocess_from_files(conf["paths"]["shot_files_all"], conf["data"]["use_shots"])
         shot_list.sort()
         shot_list_train, shot_list_test = shot_list.split_train_test(conf)
         # num_shots = len(shot_list_train) + len(shot_list_test)

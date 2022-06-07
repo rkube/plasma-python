@@ -1,12 +1,8 @@
-from __future__ import print_function
-import plasma.global_vars as g
+#!/usr/bin/env pthon
 import numpy as np
 import sys
 
-from plasma.primitives.data import (
-    Signal, ProfileSignal, ChannelSignal, Machine
-    )
-
+from plasma.primitives.data import Signal, ProfileSignal, ChannelSignal, Machine
 
 def create_missing_value_filler():
     time = np.linspace(0, 100, 100)
@@ -33,8 +29,6 @@ def fetch_d3d_data(signal_path, shot, c=None):
     if tree is None:
         signal = c.get('findsig("'+signal+'",_fstree)').value
         tree = c.get('_fstree').value
-    # if c is None:
-        # c = MDSplus.Connection('atlas.gat.com')
 
     # Retrieve data
     found = False
@@ -141,18 +135,9 @@ def fetch_nstx_data(signal_path, shot_num, c):
     return time, data, None, found
 
 
-d3d = Machine(
-    "d3d",
-    "atlas.gat.com",
-    fetch_d3d_data,
-    max_cores=32,
-    current_threshold=2e-1)
-jet = Machine(
-    "jet",
-    "mdsplus.jet.efda.org",
-    fetch_jet_data,
-    max_cores=8,
-    current_threshold=1e5)
+# Pre-define machine objects
+d3d = Machine("d3d", "atlas.gat.com", fetch_d3d_data, max_cores=32, current_threshold=2e-1)
+jet = Machine("jet", "mdsplus.jet.efda.org", fetch_jet_data, max_cores=8, current_threshold=1e5)
 nstx = Machine("nstx", "skylark.pppl.gov:8501::", fetch_nstx_data, max_cores=8)
 
 all_machines = [d3d, jet]
@@ -161,18 +146,21 @@ profile_num_channels = 128
 
 # ZIPFIT comes from actual measurements
 # jet and d3d:
+# Define ProfileSignal objects for various signals
 edens_profile_thomson = ProfileSignal(
     "Electron density profile Thomson Scattering",
     ["ELECTRONS/TS.BLESSED.CORE.DENSITY"], [ d3d],
     mapping_paths=[ None], causal_shifts=[0],
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.029])
+
 qpsi_efitrt2 = ProfileSignal(
     "q profile efitrt2",
     ["EFITRT2/RESULTS.GEQDSK.QPSI"], [ d3d],
     mapping_paths=[ None], causal_shifts=[0],
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.029])
+
 qpsi_efit01 = ProfileSignal(
     "q profile efit01",
     ["EFIT01/RESULTS.GEQDSK.QPSI"], [ d3d],
@@ -186,30 +174,35 @@ qpsi_efitrt1 = ProfileSignal(
     mapping_paths=[ None], causal_shifts=[0],
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.029])
+
 etemp_profile_thomson = ProfileSignal(
     "Electron temperature profile Thomson Scattering",
     [ "ELECTRONS/TS.BLESSED.CORE.TEMP"], [ d3d],
     mapping_paths=[ None], causal_shifts=[0],
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.029])
+
 edens_profile = ProfileSignal(
     "Electron density profile",
     ["ppf/hrts/ne", "ZIPFIT01/PROFILES.EDENSFIT"], [jet, d3d],
     mapping_paths=["ppf/hrts/rho", None], causal_shifts=[0, 10],
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.05, 0.02])
+
 etemp_profile = ProfileSignal(
     "Electron temperature profile",
     ["ppf/hrts/te", "ZIPFIT01/PROFILES.ETEMPFIT"], [jet, d3d],
     mapping_paths=["ppf/hrts/rho", None], causal_shifts=[0, 10],
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.05, 0.02])
+
 pres_prime_profile = ProfileSignal(
     "Pressure gradient profile",
     ["ppf/hrts/te", "EFITRT1/RESULTS.GEQDSK.PRES"], [jet, d3d],
     mapping_paths=["ppf/hrts/rho", None], causal_shifts=[0, 0],
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.05, 0.02])
+
 mpi66m322d_spec_profile = ProfileSignal(
     "mpi66m322d_spectrogram",
     ["", "mpi66m322d_spec"], [jet, d3d],
@@ -217,55 +210,52 @@ mpi66m322d_spec_profile = ProfileSignal(
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.05, 0.02])
 
-
 etemp_profilet = ProfileSignal(
     "Electron temperature profile tol",
     ["ppf/hrts/te", "ZIPFIT01/PROFILES.ETEMPFIT"], [jet, d3d],
     mapping_paths=["ppf/hrts/rho", None], causal_shifts=[0, 10],
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.05, 0.029])
+
 edens_profilet = ProfileSignal(
     "Electron density profile tol",
     ["ppf/hrts/ne", "ZIPFIT01/PROFILES.EDENSFIT"], [jet, d3d],
     mapping_paths=["ppf/hrts/rho", None], causal_shifts=[0, 10],
     mapping_range=(0, 1), num_channels=profile_num_channels,
     data_avail_tolerances=[0.05, 0.029])
-# d3d only:
-# etemp_profile = ProfileSignal(
-#     "Electron temperature profile", ["ZIPFIT01/PROFILES.ETEMPFIT"], [d3d],
-#     mapping_paths=[None], causal_shifts=[10], mapping_range=(0, 1),
-#     num_channels=profile_num_channels, data_avail_tolerances=[0.02])
-# edens_profile = ProfileSignal(
-#     "Electron density profile", ["ZIPFIT01/PROFILES.EDENSFIT"], [d3d],
-#     mapping_paths=[None], causal_shifts=[10], mapping_range=(0, 1),
-#     num_channels=profile_num_channels, data_avail_tolerances=[0.02])
 
 itemp_profile = ProfileSignal(
     "Ion temperature profile", ["ZIPFIT01/PROFILES.ITEMPFIT"], [d3d],
     causal_shifts=[10], mapping_range=(0, 1),
     num_channels=profile_num_channels, data_avail_tolerances=[0.02])
+
 zdens_profile = ProfileSignal(
     "Impurity density profile", ["ZIPFIT01/PROFILES.ZDENSFIT"], [d3d],
     causal_shifts=[10], mapping_range=(0, 1),
     num_channels=profile_num_channels, data_avail_tolerances=[0.02])
+
 trot_profile = ProfileSignal(
     "Rotation profile", ["ZIPFIT01/PROFILES.TROTFIT"], [d3d],
     causal_shifts=[10], mapping_range=(0, 1),
     num_channels=profile_num_channels, data_avail_tolerances=[0.02])
+
 # note, thermal pressure doesn't include fast ions
 pthm_profile = ProfileSignal(
     "Thermal pressure profile", ["ZIPFIT01/PROFILES.PTHMFIT"], [d3d],
     causal_shifts=[10], mapping_range=(0, 1),
     num_channels=profile_num_channels, data_avail_tolerances=[0.02])
+
 neut_profile = ProfileSignal(
     "Neutrals profile", ["ZIPFIT01/PROFILES.NEUTFIT"], [d3d],
     causal_shifts=[10], mapping_range=(0, 1),
     num_channels=profile_num_channels, data_avail_tolerances=[0.02])
+
 # compare the following profile to just q95 0D signal
 q_profile = ProfileSignal(
     "Q profile", ["ZIPFIT01/PROFILES.BOOTSTRAP.QRHO"], [d3d],
     causal_shifts=[10], mapping_range=(0, 1),
     num_channels=profile_num_channels, data_avail_tolerances=[0.02])
+
 bootstrap_current_profile = ProfileSignal(
     "Rotation profile", ["ZIPFIT01/PROFILES.BOOTSTRAP.JBS_SAUTER"], [d3d],
     causal_shifts=[10], mapping_range=(0, 1),
@@ -318,22 +308,27 @@ q95 = Signal(
     "q95 safety factor", ['ppf/efit/q95', "EFITRT1/RESULTS.AEQDSK.Q95"],
     [jet, d3d], causal_shifts=[0,0], normalize=False,
     data_avail_tolerances=[0.03, 0.02])
+
 qmin = Signal(
     "Minimum safety factor", [ "EFITRT1/RESULTS.AEQDSK.QMIN"],
     [d3d], causal_shifts=[0], normalize=False,
     data_avail_tolerances=[0.02])
+
 q95_EFITRT1 = Signal(
     "q95 safety factor in real time", ['ppf/efit/q95', "EFITRT1/RESULTS.AEQDSK.Q95"],
     [jet, d3d], causal_shifts=[0, 0], normalize=False,
     data_avail_tolerances=[0.03, 0.029])
+
 q95_efitrt2 = Signal(
     "q95 safety factor in real time efitrt2", ['ppf/efit/q95', "EFITRT2/RESULTS.AEQDSK.Q95"],
     [jet, d3d], causal_shifts=[0, 0], normalize=False,
     data_avail_tolerances=[0.03, 0.029])
+
 vd = Signal(
     "vertical displacement change", [ "/vpsdfz"],
     [d3d], causal_shifts=[ 0], normalize=False,
     data_avail_tolerances=[ 0.029])
+
 q95t = Signal(
     "q95 safety factor tol", ['ppf/efit/q95', "EFIT01/RESULTS.AEQDSK.Q95"],
     [jet, d3d], causal_shifts=[15, 10], normalize=False,
@@ -351,27 +346,42 @@ ipori = Signal("plasma current", ["jpf/da/c2-ipla", "/ipspr15V"],
 
 ipt = Signal("plasma current tol", ["jpf/da/c2-ipla", "/ipsip"],
             [jet, d3d], is_ip=True,data_avail_tolerances=[0.029, 0.029])
+
 iptarget = Signal("plasma current target", ["/ipsiptargt"], [d3d])
+
 iptargett = Signal("plasma current target tol", ["/ipsiptargt"], [d3d],data_avail_tolerances=[0.029])
+
 iperr = Signal("plasma current error", ["/ipeecoil"], [d3d])
+
 iperrt = Signal("plasma current error tol", ["/ipeecoil"], [d3d],data_avail_tolerances=[0.029])
 
 li = Signal("internal inductance", ["jpf/gs/bl-li<s", "/efsli"], [jet, d3d])
+
 lit = Signal("internal inductance tol", ["jpf/gs/bl-li<s", "/efsli"], [jet, d3d],data_avail_tolerances=[0.029, 0.029])
+
 lm = Signal("Locked mode amplitude", ['jpf/da/c2-loca', '/dusbradial'],
             [jet, d3d])
+
 lmt = Signal("Locked mode amplitude tol", ['jpf/da/c2-loca', '/dusbradial'],
             [jet, d3d],data_avail_tolerances=[0.029, 0.029])
+
 n1_rms = Signal("n1 finite frequency signals",['mhd/mirnov.n1rms'],[d3d],data_avail_tolerances=[0.029],causal_shifts=10)
+
 n2_rms_10 = Signal("n2 finite frequency signals_10ms",['mhd/mirnov.n2rms'],[d3d],data_avail_tolerances=[0.029],causal_shifts=10)
+
 n3_rms_10 = Signal("n3 finite frequency signals_10ms",['mhd/mirnov.n3rms'],[d3d],data_avail_tolerances=[0.029],causal_shifts=10)
+
 n1_rms_no_shift = Signal("n1 finite frequency signals no shift",['mhd/mirnov.n1rms'],[d3d],data_avail_tolerances=[0.029])
+
 dens = Signal("Plasma density", ['jpf/df/g1r-lid:003', '/dssdenest'],
               [jet, d3d], is_strictly_positive=True)
+
 denst = Signal("Plasma density tol", ['jpf/df/g1r-lid:003', '/dssdenest'],
               [jet, d3d], is_strictly_positive=True,data_avail_tolerances=[0.029, 0.029])
+
 energy = Signal("stored energy", ['jpf/gs/bl-wmhd<s', '/efswmhd'],
                 [jet, d3d])
+
 energyt = Signal("stored energy tol", ['jpf/gs/bl-wmhd<s', '/efswmhd'],
                 [jet, d3d],data_avail_tolerances=[0.029, 0.029])
 # Total beam input power
@@ -381,6 +391,7 @@ pint = Signal("Input Power (beam for d3d) tol", ['jpf/gs/bl-ptot<s', '/bmspinj']
              [jet, d3d],data_avail_tolerances=[0.029, 0.029])
 
 pradtot = Signal("Radiated Power", ['jpf/db/b5r-ptot>out'], [jet])
+
 pradtott = Signal("Radiated Power tol", ['jpf/db/b5r-ptot>out'], [jet],data_avail_tolerances=[0.029])
 # pradtot = Signal("Radiated Power", ['jpf/db/b5r-ptot>out',
 # 'd3d/'+r'\prad_tot'], [jet,d3d])
@@ -391,51 +402,79 @@ pradtott = Signal("Radiated Power tol", ['jpf/db/b5r-ptot>out'], [jet],data_avai
 pradcore = ChannelSignal("Radiated Power Core",
                          ['ppf/bolo/kb5h/channel14', '/' + r'\bol_l15_p'],
                          [jet, d3d])
+
 pradedge = ChannelSignal("Radiated Power Edge",
                          ['ppf/bolo/kb5h/channel10', '/' + r'\bol_l03_p'],
                          [jet, d3d])
+
 pradcoret = ChannelSignal("Radiated Power Core tol",
                          ['ppf/bolo/kb5h/channel14', '/' + r'\bol_l15_p'],
                          [jet, d3d],data_avail_tolerances=[0.029, 0.029])
+
 pradedget = ChannelSignal("Radiated Power Edge tol" ,
                          ['ppf/bolo/kb5h/channel10', '/' + r'\bol_l03_p'],
                          [jet, d3d],data_avail_tolerances=[0.029, 0.029])
+
 # pechin = Signal("ECH input power, not always on", ['d3d/pcechpwrf'], [d3d])
+
 pechin = Signal("ECH input power, not always on",
                 ['RF/ECH.TOTAL.ECHPWRC'], [d3d])
+
 pechint = Signal("ECH input power, not always on tol",
                 ['RF/ECH.TOTAL.ECHPWRC'], [d3d],data_avail_tolerances=[0.029])
 
 # betan = Signal("Normalized Beta", ['jpf/gs/bl-bndia<s', 'd3d/efsbetan'],
+
 # [jet, d3d])
+
 betan = Signal("Normalized Beta", ['/efsbetan'], [d3d])
+
 betant = Signal("Normalized Beta tol", ['/efsbetan'], [d3d],data_avail_tolerances=[0.029])
+
 energydt = Signal(
     "stored energy time derivative", ['jpf/gs/bl-fdwdt<s'], [jet])
 
 torquein = Signal("Input Beam Torque", ['/bmstinj'], [d3d])
+
 fs07 = Signal("filterscope fs07", ['/fs07'], [d3d])
+
 neped = Signal("neped", ['/prmtan_neped'], [d3d])
+
 newid = Signal("newid", ['/prmtan_newid'], [d3d])
+
 peped = Signal("peped", ['/prmtan_peped'], [d3d])
+
 teped = Signal("teped", ['/prmtan_teped'], [d3d])
+
 tewid = Signal("tewid", ['/prmtan_tewid'], [d3d])
+
 torqueint = Signal("Input Beam Torque tol", ['/bmstinj'], [d3d],data_avail_tolerances=[0.029])
+
 tmamp1 = Signal("Tearing Mode amplitude (rotating 2/1)", ['/nssampn1l'],
                 [d3d])
+
 tmamp2 = Signal("Tearing Mode amplitude (rotating 3/2)", ['/nssampn2l'],
                 [d3d])
+
 tmfreq1 = Signal("Tearing Mode frequency (rotating 2/1)", ['/nssfrqn1l'],
                  [d3d])
+
 tmfreq2 = Signal("Tearing Mode frequency (rotating 3/2)", ['/nssfrqn2l'],
                  [d3d])
+
 ipdirect = Signal("plasma current direction", ["/iptdirect"], [d3d])
+
 ipdirectt = Signal("plasma current direction tol", ["/iptdirect"], [d3d],data_avail_tolerances=[0.029])
 
 # for downloading, modify this to preprocess shots with only a subset of
 # signals. This may produce more shots
 # since only those shots that contain all_signals contained here are used.
 
+#############################################################################################
+#                                                                                           #
+#                                Define collection os signals                               #
+#                                                                                           #
+#############################################################################################
 # Restricted subset to those signals that are present for most shots. The
 # idea is to remove signals that cause many shots to be dropped from the
 # dataset.
@@ -570,12 +609,9 @@ all_signals_ped_spec = { 'qmin':qmin,
     'newid':newid,
     'peped':peped,
     'tewid':tewid,
-   # 'energydt': energydt, 'ipdirect': ipdirect,
     'iptarget': iptarget,
-    #'iperr': iperr,
     'etemp_profile': etemp_profile, 'edens_profile': edens_profile,
     'mpi66m322d_spec_profile':mpi66m322d_spec_profile,
-#    'pres_prime_profile':pres_prime_profile,
     'qpsi_efitrt1':qpsi_efitrt1
 }
 
