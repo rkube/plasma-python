@@ -1,4 +1,6 @@
-'''
+# -*- coding: utf-8 -*-
+
+"""
 #########################################################
 This file containts classes to handle data processing
 
@@ -6,7 +8,7 @@ Author: Julian Kates-Harbeck, jkatesharbeck@g.harvard.edu
 
 This work was supported by the DOE CSGF program.
 #########################################################
-'''
+"""
 
 from __future__ import print_function, division
 import numpy as np
@@ -14,11 +16,10 @@ import numpy as np
 from plasma.primitives.shots import Shot
 import multiprocessing as mp
 
-# import pdb
 
 
 class Loader(object):
-    '''A Python class to ...
+    """A Python class to ...
 
     The length of shots in e.g. JET data varies by orders of magnitude. For
     data parallel synchronous training it is essential that amounds of train
@@ -33,7 +34,7 @@ class Loader(object):
     length is less than the rnn_length, then the patch length is equal to the
     rnn_length
 
-    '''
+    """
 
     def __init__(self, conf, normalizer=None):
         self.conf = conf
@@ -45,7 +46,9 @@ class Loader(object):
         self.normalizer.set_inference_mode(val)
 
     def training_batch_generator(self, shot_list):
-        """The method implements a training batch generator as a Python
+        """Generate training batches.
+        
+        The method implements a training batch generator as a Python
         generator with a while-loop.  It iterates indefinitely over the
         data set and returns one mini-batch of data at a time.
 
@@ -154,7 +157,8 @@ class Loader(object):
         return new_buff
 
     def inference_batch_generator_full_shot(self, shot_list):
-        """
+        """Batch generator
+
         The method implements a training batch generator as a Python generator
         with a while-loop.
 
@@ -170,11 +174,12 @@ class Loader(object):
 
         Returns:
           - One mini-batch of data and label as a Numpy array:
-                 X[start:end],y[start:end]
+             X[start:end],y[start:end]
           - reset_states_now: boolean flag indicating when to reset state
             during stateful RNN training
           - num_so_far,num_total: number of samples generated so far and
             the total dataset size as per shot_list
+
         """
         batch_size = self.conf['model']['pred_batch_size']
         sig, res = self.get_signal_result_from_shot(shot_list.shots[0])
@@ -231,7 +236,7 @@ class Loader(object):
                     batch_idx = 0
 
     def training_batch_generator_full_shot_partial_reset(self, shot_list):
-        """
+        """Another training generator.
 
         The method implements a training batch generator as a Python generator
         with a while-loop. It iterates indefinitely over the data set and
@@ -305,7 +310,9 @@ class Loader(object):
         return shot
 
     def training_batch_generator_partial_reset(self, shot_list):
-        """
+        """Another training generator
+
+
         The method implements a training batch generator as a Python generator
         with a while-loop. It iterates indefinitely over the data set and
         returns one mini-batch of data at a time.
@@ -393,7 +400,9 @@ class Loader(object):
 
     def load_as_X_y_list(self, shot_list, verbose=False,
                          prediction_mode=False):
-        """
+        """Does magic.
+
+
         The method turns a ShotList into a set of equal-sized patches which
         contain a number of examples that is a multiple of the batch size.
         Initially, shots are "light" meaning signal amd disruption related
@@ -625,7 +634,9 @@ class Loader(object):
         return max_len
 
     def make_patches(self, signals, results):
-        """A patch is a subset of shot's time/signal profile having a fixed
+        """Things.
+        
+        A patch is a subset of shot's time/signal profile having a fixed
         length, equal among all patches.  Patch size is approximately equal to
         the minimum shot length. More precisely: it is equal to the max(1,
         min_len//rnn_length)*rnn_length - the largest number less or equal to

@@ -17,36 +17,26 @@ class ConvTTLSTMCell(nn.Module):
         order = 3, steps = 3, ranks = 8,
         # convolutional operations
         kernel_size = 5, bias = True):
-        """
-        Initialization of convolutional tensor-train LSTM cell.
+        """Initialization of convolutional tensor-train LSTM cell.
 
-        Arguments:
-        ----------
-        (Hyper-parameters of the input/output channels)
-        input_channels:  int
-            Number of input channels of the input tensor.
-        hidden_channels: int
-            Number of hidden/output channels of the output tensor.
-        Note: the number of hidden_channels is typically equal to the one of input_channels.
+        Arguments:    
+          input_channels:  (int) Number of input channels of the input tensor.
+          hidden_channels: (int) Number of hidden/output channels of the output tensor.
+               Note: the number of hidden_channels is typically equal to the one of input_channels.
 
-        (Hyper-parameters of the convolutional tensor-train format)
-        order: int
-            The order of convolutional tensor-train format (i.e. the number of core tensors).
+        order: (int) The order of convolutional tensor-train format (i.e. the number of core tensors).
             default: 3
-        steps: int
-            The total number of past steps used to compute the next step.
+        steps: (int) The total number of past steps used to compute the next step.
             default: 3
-        ranks: int
+        ranks: (int)
             The ranks of convolutional tensor-train format (where all ranks are assumed to be the same).
             default: 8
 
-        (Hyper-parameters of the convolutional operations)
-        kernel_size: int or (int, int)
-            Size of the (squared) convolutional kernel.
+    
+        kernel_size: int or (int, int) Size of the (squared) convolutional kernel.
             Note: If the size is a single scalar k, it will be mapped to (k, k)
             default: 5
-        bias: bool
-            Whether or not to add the bias in each convolutional operation.
+        bias: (bool)  Whether or not to add the bias in each convolutional operation.
             default: True
         """
         super(ConvTTLSTMCell, self).__init__()

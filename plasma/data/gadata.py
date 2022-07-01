@@ -1,6 +1,34 @@
-import MDSplus
-import numpy
-# import time
+# -*- coding: utf-8 -*-
+
+import numpy as np
+
+try:
+    import MDSplus as mds
+except ModuleNotFoundError as e:
+    print("Can't import module MDSplus: ", e)
+    print("Defining dummy routines.")
+
+    class mds():
+        """Dummy MDS class
+
+        Implements dummy methods. This fakes everything
+        and is very usefu for building sphimx documentation.
+        """
+
+        def __init__(self):
+            pass
+
+        def get(self):
+            pass
+
+        def openTree(self):
+            pass
+
+
+
+
+
+
 
 
 class gadata:
@@ -26,7 +54,7 @@ class gadata:
 
         # Create the MDSplus connection (thin) if not passed in
         if self.connection is None:
-            self.connection = MDSplus.Connection('atlas.gat.com')
+            self.connection = mds.Connection('atlas.gat.com')
 
         # Retrieve data from MDSplus (thin)
         if not nomds:
@@ -71,12 +99,12 @@ class gadata:
 
                 # MDSplus seems to return 2-D arrays transposed.  Change them
                 # back.
-                if numpy.ndim(self.zdata) == 2:
-                    self.zdata = numpy.transpose(self.zdata)
-                if numpy.ndim(self.ydata) == 2:
-                    self.ydata = numpy.transpose(self.ydata)
-                if numpy.ndim(self.xdata) == 2:
-                    self.xdata = numpy.transpose(self.xdata)
+                if np.ndim(self.zdata) == 2:
+                    self.zdata = self.zdata.T
+                if np.ndim(self.ydata) == 2:
+                    self.ydata = self.ydata.T
+                if np.ndim(self.xdata) == 2:
+                    self.xdata = self.xdata.T
 
             except Exception as e:
                 print(e)
