@@ -6,7 +6,7 @@ Class representations of measurement signals.
 """
 
 from os import remove
-from os.path import isfile, join
+from os.path import isfile, join, getsize
 
 import logging
 
@@ -15,6 +15,8 @@ import numpy as np
 from plasma.utils.processing import get_individual_shot_file
 from plasma.utils.downloading import get_missing_value_array
 from plasma.utils.hashing import myhash
+from plasma.utils.errors import NotDownloadedError, SignalCorruptedError
+
 
 class Signal():
     """Represents a signal.
@@ -78,59 +80,70 @@ class Signal():
         """
 
         dirname = self.get_path(machine)
-        return get_individual_shot_file(join(prepath, 
-                                             machine.name, 
-                                             dirname), shot_number)
+        return get_individual_shot_file(join(prepath, machine.name, dirname), shot_number)
 
     def is_valid(self, prepath, shot, dtype='float32'):
         t, data, exists = self.load_data(prepath, shot, dtype)
         return exists
 
-    def is_saved(self, prepath, shot):
-        file_path = self.get_file_path(prepath, shot.machine, shot.number)
-        return isfile(file_path)
 
-    def load_data_from_txt_safe(self, prepath, shot, dtype='float32'):
+    def _load_data_from_txt_safe(self, prepath, shot, dtype='float32'):
         """Safely load signal data from a stored txt file.
 
-
         Args:
-        prepath:  
-        shot:
-        dtype:
-
+          prepath:
+          shot:
+          dtype:
 
         Returns:
-        data: ndarray(float) Signal data 
+          data: ndarray(float) Signal data 
+
+        Raises
+          NotDownloadedError when the signal was not downloaded.
+          SignalCorruptedError when the file has zero size, or missing_value_array was written to the file.
+
+        This method acts as a safe wrapper around np.loadtxt and adds additional error handling.
+        The base class and all derived classes call this method to perform additional data
+        manipulation for tasks downstream.
 
         """
+        # Build the path
         file_path = self.get_file_path(prepath, shot.machine, shot.number)
-        if not self.is_saved(prepath, shot):
-            print(f"Signal {self.description} , shot {shot.number} was never downloaded")
-            return None, False
+        # Make sure the file exists and has non-zero size so that we can raise
+        # more specific error messages.
+        if not isfile(file_path):
+            raise NotDownloadedError(f"Signal {self.description} , shot {shot.number} was never downloaded")
 
-        if os.path.getsize(file_path) == 0:
-            print(f"Signal {self.description}, shot {shot.number} was downloaded incorrectly (empty file). Removing.")
-            remove(file_path)
-            return None, False
+        if getsize(file_path) == 0:
+            raise SignalCorruptedError(f"Signal {self.description}, shot {shot.number} was downloaded incorrectly (empty file). Removing.")
 
-        try:
-            data = np.loadtxt(file_path, dtype=dtype)
-            if np.all(data == get_missing_value_array()):
-                print(f"Signal {self.description}, shot {shot.number} contains no data")
-                return None, False
-        except Exception as e:
-            print(e)
-            print(f"Couldnt load signal {self.description} shot {shot.number} from {file.path}. Removing")
-            remove(file_path)
-            return None, False
+        # Load the data from a numpy file. Do not catch errors, but let them propagate through.
+        data = np.loadtxt(file_path, dtype=dtype)
+        if np.all(data == get_missing_value_array()):
+            raise SignalCorruptedError(f"Signal {self.description}, shot {shot.number} contains no data")
 
-        return data, True
+        return data
 
     def load_data(self, prepath, shot, dtype='float32'):
-        data, succ = self.load_data_from_txt_safe(prepath, shot)
-        if not succ:
-            return None, None, False
+        """Loads data from txt file and peforms data wrangling.
+
+        Args:
+          prepath:
+          shot:
+          dtype:
+
+        Returns:
+          data: ndarray(float) Signal data 
+
+        Raises
+          SignalCorruptedError: When the interval where the current threshold is satisfied is too short.
+                                When the time interval is too short
+                                If the dynamic range of the signal is too low
+                                If the timebase or the signal contains NaNs
+        
+        
+        """
+        data = self._load_data_from_txt_safe(prepath, shot)
 
         if np.ndim(data) == 1:
             data = np.expand_dims(data, axis=0)
@@ -138,15 +151,19 @@ class Signal():
         t = data[:, 0]
         sig = data[:, 1:]
 
-        if self.is_ip:  # restrict shot to current threshold
+        # If desired, restrict the signal to the interval where the current threshold is satisfied.
+        if self.is_ip: 
             region = np.where(np.abs(sig) >= shot.machine.current_threshold)[0]
+            # Raise an error if the interval is too short.
             if len(region) == 0:
-                print(f"shot {shot.number} has no current")
-                return None, sig.shape, False
-            first_idx = region[0]
-            last_idx = region[-1]
+                err_msg  = f"Shot {shot.number}: Interval where current threshold is satisfied is too short."
+                logging.error(err_msg)
+                raise SignalCorruptedError(err_msg)
+        
+            first_idx, last_idx = region[0], region[-1]
+            
             # add 50 ms to cover possible disruption event
-            last_time = t[last_idx]+5e-2
+            last_time = t[last_idx] + 5e-2
             last_indices = np.where(t > last_time)[0]
             if len(last_indices) == 0:
                 last_idx = -1
@@ -156,40 +173,54 @@ class Signal():
             sig = sig[first_idx:last_idx, :]
 
         # make sure shot is not garbage data
-        if len(t) <= 1 or (np.max(sig) == 0.0 and np.min(sig) == 0.0):
-            if self.is_ip:
-                print(f"shot {shot.number} has no current")
-            else:
-                print(f"Signal {self.description}, shot {shot.number} contains no data")
-            return None, sig.shape, False
+        # The length should be larger than one
+        # If the dynamic range of the signal is too low we assuem it is garbage data
+        if len(t) <= 1:
+            raise SignalCorruptedError(f"Signal {self.description}, shot {shot.number} is contains no data.")
+
+        if (np.max(sig) - np.min(sig) < 1e-8):
+            raise SignalCorruptedError(f"Dynamic range of signal {self.description}, shot {shot.number}, is smaller than 1e-8")
 
         # make sure data doesn't contain nan
         if np.any(np.isnan(t)) or np.any(np.isnan(sig)):
-            print(f"Signal {self.description}, shot {shot.number}")
-            return None, sig.shape, False
+            raise SignalCorruptedError(f"Signal {self.description}, shot {shot.number} contains NaNs")
 
-        return t, sig, True
+        # Finall,y return time base and the signal
+        return t, sig
 
-    def fetch_data_basic(self, machine, shot_num, c, path=None):
+
+    def _fetch_data_basic(self, machine, shot_num, c, path=None):
+        """Fetches the signal data using the machine connection.
+        
+        Args:
+          machine: (machine) Machine for which to download the data
+          shot_num: Shot number
+          c: ???
+          path: (string) Optional path to over-ride the generated signal path
+        
+        Returns:
+          time: Time-base for the signal
+          data: Signal data
+          mapping: ???
+
+
+        This method fetches the signal data using the connection mechanism for a machine.
+        The function should be identical to _load_data_basic.
+        The base class and all derived classes call this method to perform additional data
+        manipulation for tasks downstream.
+        """
         if path is None:
             path = self.get_path(machine)
-        success = False
+        
         mapping = None
-        try:
-            time, data, mapping, success = machine.fetch_data_fn(
-                path, shot_num, c)
-        except Exception as e:
-            print(e)
-            sys.stdout.flush()
+        time, data, mapping, success = machine.fetch_data(path, shot_num, c)
+        time = np.array(time) + 1e-3 * self.get_causal_shift(machine)
 
-        if not success:
-            return None, None, None, False
-
-        time = np.array(time) + 1e-3*self.get_causal_shift(machine)
         return time, np.array(data), mapping, success
 
     def fetch_data(self, machine, shot_num, c):
-        return self.fetch_data_basic(machine, shot_num, c)
+
+        raise DeprecationWarning("Use Signal.fetch_data!")
 
     def is_defined_on_machine(self, machine):
         return machine in self.machines

@@ -24,13 +24,6 @@ except ModuleNotFoundError as e:
         def openTree(self):
             pass
 
-
-
-
-
-
-
-
 class gadata:
     """GA Data Obj"""
 

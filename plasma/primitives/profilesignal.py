@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
+from scipy.interpolate import UnivariateSpline
+import logging
+
+
+
 from plasma.primitives.signal import Signal
+from plasma.utils.errors import SignalCorruptedError
 
 
 class ProfileSignal(Signal):
@@ -21,12 +28,30 @@ class ProfileSignal(Signal):
         self.num_channels = num_channels
 
     def load_data(self, prepath, shot, dtype='float32'):
-        data, succ = self.load_data_from_txt_safe(prepath, shot)
-        if not succ:
-            return None, None, False
+       """Loads data from txt file and peforms data wrangling into a profile.
+
+        Args:
+          prepath:
+          shot:
+          dtype:
+
+        Returns:
+          t: ndarray(float) Signal time base
+          sig_inter: Interpolated signal 
+
+        Raises
+          SignalCorruptedError: When the interval where the current threshold is satisfied is too short.
+                                When the time interval is too short
+                                If the dynamic range of the signal is too low
+                                If the timebase or the signal contains NaNs
+        
+        
+        """
+        data = self._load_data_from_txt_safe(prepath, shot)
 
         if np.ndim(data) == 1:
             data = np.expand_dims(data, axis=0)
+
         # time is stored twice, once for mapping and once for signal
         T = data.shape[0]//2
         mapping = data[:T, 1:]
@@ -35,20 +60,24 @@ class ProfileSignal(Signal):
         t = data[:T, 0]
         sig = data[T:, 1:]
         if sig.shape[1] < 2:
-            print(f"Signal {self.description}, shot {shot.number} ",
-                  'should be profile but has only one channel. Possibly only ',
-                  'one profile fit was run for the duration of the shot and ',
-                  'was transposed during downloading. Need at least 2.')
-            return None, None, False
-        if len(t) <= 1 or (np.max(sig) == 0.0 and np.min(sig) == 0.0):
-            print('Signal {}, shot {} '.format(self.description, shot.number),
-                  'contains no data.')
-            return None, None, False
-        if np.any(np.isnan(t)) or np.any(np.isnan(sig)):
-            print('Signal {}, shot {} '.format(self.description, shot.number),
-                  'contains NaN value(s).')
-            return None, None, False
+            err_msg = f"""Signal {self.description}, shot {shot.number}
+should be profile but has only one channel. Possibly only
+one profile fit was run for the duration of the shot and 
+was transposed during downloading. Need at least 2."""
+            logging.error(err_msg)
+            raise SignalCorruptedError(err_msg)
 
+        if len(t) <= 1 or (np.max(sig) == 0.0 and np.min(sig) == 0.0):
+            err_msg = f"Signal {self.description}, shot {shot.number} contains no data "
+            logging.error(err_msg)
+            raise SignalCorruptedError(err_msg)
+
+        if np.any(np.isnan(t)) or np.any(np.isnan(sig)):
+            err_msg = f"Signal {self.description}, shot {shot.number} contains NaN value(s)"
+            logging.error(err_msg)
+            raise SignalCorruptedError(err_msg)
+    
+        # 
         timesteps = len(t)
         sig_interp = np.zeros((timesteps, self.num_channels))
         for i in range(timesteps):
@@ -60,17 +89,16 @@ class ProfileSignal(Signal):
                                      k=1, ext=3)
                 sig_interp[i, :] = f(remapping)
             else:
-                print('Signal {}, shot {} '.format(self.description,
-                                                   shot.number),
-                      'has insufficient points for linear interpolation. ',
-                      'dfitpack.error: (m>k) failed for hidden m: fpcurf0:m=1')
-                return None, None, False
+                err_msg = f"""Signal {self.description}, shot {shot.number} 
+has insufficient points for linear interpolation. 
+dfitpack.error: (m>k) failed for hidden m: fpcurf0:m=1"""
+                logging.error(err_msg)
+                raise SignalCorruptedError(err_msg)
 
-        return t, sig_interp, True
+        return t, sig_interp
 
     def fetch_data(self, machine, shot_num, c):
-        time, data, mapping, success = self.fetch_data_basic(machine, shot_num,
-                                                             c)
+        time, data, mapping, success = self._fetch_data_basic(machine, shot_num, c)
         path = self.get_path(machine)
         mapping_path = self.get_mapping_path(machine)
 

@@ -17,7 +17,15 @@ import logging
 
 
 def parse_config(input_file):
-    """Parse yaml file of configuration parameters."""
+    """Parse yaml file of configuration parameters.
+    
+    Performs various tasks:
+    1. Assemble a params['paths']['signal_prepath'] - A list of directories to look for data
+    2.   
+    
+    
+    
+    """
     with open(input_file, 'r') as yaml_file:
         params = yaml.load(yaml_file, Loader=yaml.SafeLoader)
 
@@ -47,32 +55,34 @@ def parse_config(input_file):
                     logging.info(f"Adding data directory {join(params['paths']['base_path'], path)}")
                 except FileNotFoundError as err:
                     logging.error(f"Can't use {path} for signal_prepath: {err}")
+                    raise(err)
 
         else:
             # Do the same, but only for the single directory given
             path = join(params["paths"]["base_path"], params["paths"]["signal_prepath"])
             try:
                 stat(path)
-                prepath_list = [path]
-                prepath_list.append(path)
                 logging.info(f"Adding data directory {path}")
             except FileNotFoundError as err:
                 logging.error(f"Can't use {path} for signal_prepath: {err}")
+                raise(err)
+            prepath_list = [path]
 
+        # If somehow prepath_list is still empty we need to abort.
         if(len(prepath_list) == 0):
-            raise ValueError("len(prepath_list) == 0")
-
+            raise ValueError("Could not assemble list of prepaths: len(prepath_list) == 0")
         params["paths"]["signal_prepath"] = prepath_list
 
-        # Set directory for shot_list_dir
-        try:
-            path = join(params["paths"]["base_path"], params['paths']['shot_list_dir'])
 
+        # Set shot_list_dir
+        path = join(params["paths"]["base_path"], params['paths']['shot_list_dir'])
+        try:
             stat(path)
-            params['paths']['shot_list_dir'] = path
         except FileNotFoundError as err:
             logging.error(err)
             raise err
+        params['paths']['shot_list_dir'] = path
+
             
         # By setting paths.data_collection we define a set of signals that will be loaded during
         # pre-processing. These collections are defined in data/signals.py
@@ -81,49 +91,19 @@ def parse_config(input_file):
         # 1. A data specific hash h
         # 2. Define the named collection in params["paths"]["all_signals_dict"]
         if params['paths']['data'] == 'd3d_data_gar18':
-            h = myhash_signals(user_signals.all_signals_gar18.values())
-            params['paths']['all_signals_dict'] = user_signals.all_signals_gar18
+            h = myhash_signals(user_signals.signal_group_gar18.values())
+            params['paths']['all_signals_dict'] = user_signals.signal_group_gar18
+            params['paths']['use_signals_dict'] = user_signals.signal_group_gar18
             params['paths']['shot_files'] = [d3d_full_new]
             params['paths']['shot_files_test'] = []
-            params['paths']['use_signals_dict'] = {
-                'q95t': user_signals.q95t,
-                'lit': user_signals.lit,
-                'ipt': user_signals.ipt,
-                'lmt': user_signals.lmt,
-                'betant': user_signals.betant,
-                'energyt': user_signals.energyt,
-                'denst': user_signals.denst,
-                'pradcoret': user_signals.pradcoret,
-                'pradedget': user_signals.pradedget,
-                'pint': user_signals.pint,
-                'torqueint': user_signals.torqueint,
-                'ipdirectt': user_signals.ipdirectt,
-                'iptargett': user_signals.iptargett,
-                'iperrt': user_signals.iperrt,
-                'etemp_profilet': user_signals.etemp_profilet,
-                'edens_profilet': user_signals.edens_profilet,
-            }
+            
+
         if params['paths']['data'] == 'd3d_data':
+            h = myhash_signals(user_signals.signal_group_d3d_all.values())
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []
-            params['paths']['use_signals_dict'] = {
-                'q95': user_signals.q95,
-                'li': user_signals.li,
-                'ip': user_signals.ip,
-                'lm': user_signals.lm,
-                'betan': user_signals.betan,
-                'energy': user_signals.energy,
-                'dens': user_signals.dens,
-                'pradcore': user_signals.pradcore,
-                'pradedge': user_signals.pradedge,
-                'pin': user_signals.pin,
-                'torquein': user_signals.torquein,
-                'ipdirect': user_signals.ipdirect,
-                'iptarget': user_signals.iptarget,
-                'iperr': user_signals.iperr,
-                'etemp_profile': user_signals.etemp_profile,
-                'edens_profile': user_signals.edens_profile,
-            }
+            params['paths']['use_signals_dict'] = user_signals.signal_group_d3d_all
+            params['paths']['all_signals_dict'] = user_signals.signal_group_d3d_all
 #
 
         elif params['paths']['data'] == 'd3d_data_n1rms':
@@ -603,345 +583,7 @@ def parse_config(input_file):
             params['paths']['shot_files'] = [jet_carbon_wall]
             params['paths']['shot_files_test'] = [jet_iterlike_wall]
             params['paths']['use_signals_dict'] = user_signals.fully_defined_signals_0D
-#        elif params['paths']['data'] == 'd3d_data_ori':
-#            params['paths']['shot_files'] = [d3d_full]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95': user_signals.q95,
-#                'li': user_signals.li,
-#                'ipori': user_signals.ipori,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                'ipdirect': user_signals.ipdirect,
-#                'iptarget': user_signals.iptarget,
-#                'iperr': user_signals.iperr,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#            }
-#
-#        elif params['paths']['data'] == 'd3d_data':
-#            params['paths']['shot_files'] = [d3d_full]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95': user_signals.q95,
-#                'li': user_signals.li,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                'ipdirect': user_signals.ipdirect,
-#                'iptarget': user_signals.iptarget,
-#                'iperr': user_signals.iperr,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#            }
-#        elif params['paths']['data'] in ['d3d_data_gar18','d3d_data_garbage']:
-#            params['paths']['shot_files'] = [d3d_full_new]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95t': user_signals.q95t,
-#                'lit': user_signals.lit,
-#                'ipt': user_signals.ipt,
-#                'lmt': user_signals.lmt,
-#                'betant': user_signals.betant,
-#                'energyt': user_signals.energyt,
-#                'denst': user_signals.denst,
-#                'pradcoret': user_signals.pradcoret,
-#                'pradedget': user_signals.pradedget,
-#                'pint': user_signals.pint,
-#                'torqueint': user_signals.torqueint,
-#                'ipdirectt': user_signals.ipdirectt,
-#                'iptargett': user_signals.iptargett,
-#                'iperrt': user_signals.iperrt,
-#                'etemp_profilet': user_signals.etemp_profilet,
-#                'edens_profilet': user_signals.edens_profilet,
-#            }
 
-#        elif params['paths']['data'] in ['d3d_data_thomson']:
-#            params['paths']['shot_files'] = [d3d_full_new]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95t': user_signals.q95,
-#                'lit': user_signals.li,
-#                'ipt': user_signals.ip,
-#                'lmt': user_signals.lm,
-#                'betant': user_signals.betan,
-#                'energyt': user_signals.energy,
-#                'denst': user_signals.dens,
-#                'pradcoret': user_signals.pradcore,
-#                'pradedget': user_signals.pradedge,
-#                'pint': user_signals.pin,
-#                'torqueint': user_signals.torquein,
-#                'ipdirectt': user_signals.ipdirect,
-#                'iptargett': user_signals.iptarget,
-#                'iperrt': user_signals.iperr,
-#                'etemp_profile_thomson': user_signals.etemp_profile_thomson,
-#                'edens_profile_thomson': user_signals.edens_profile_thomson,
-#            }
-#        
-#        elif params['paths']['data'] in ['d3d_data_n1rms_qmin']:
-#            params['paths']['shot_files'] = [d3d_full_new]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95': user_signals.q95,
-#                'qmin': user_signals.qmin,
-#                'li': user_signals.li,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                'ipdirect': user_signals.ipdirect,
-#                'iptarget': user_signals.iptarget,
-#                'iperr': user_signals.iperr,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#                'n1_rms': user_signals.n1_rms,
-#                'n1_rms_no_shift': user_signals.n1_rms_no_shift,
-#            }
-#
-
-#        elif params['paths']['data'] in ['d3d_data_n1rms_thomson']:
-#            params['paths']['shot_files'] = [d3d_full_new]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95_EFITRT1': user_signals.q95_EFITRT1,
-#                'li': user_signals.li,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                'ipdirect': user_signals.ipdirect,
-#                'iptarget': user_signals.iptarget,
-#                'iperr': user_signals.iperr,
-#                'etemp_profile_thomson': user_signals.etemp_profile_thomson,
-#                'edens_profile_thomson': user_signals.edens_profile_thomson,
-#                'n1_rms': user_signals.n1_rms,
-#                'n1_rms_no_shift': user_signals.n1_rms_no_shift,
-#            }
-#
-#        elif params['paths']['data'] in ['d3d_data_fs07']:
-#            params['paths']['shot_files'] = [d3d_full_new]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95': user_signals.q95,
-#                'li': user_signals.li,
-#                'fs07': user_signals.fs07,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                'ipdirect': user_signals.ipdirect,
-#                'iptarget': user_signals.iptarget,
-#                'iperr': user_signals.iperr,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#                'n1_rms': user_signals.n1_rms,
-#                'n1_rms_no_shift': user_signals.n1_rms_no_shift,
-#            }
-
-#        elif params['paths']['data'] in ['d3d_data_ped_spec']:
-#            params['paths']['shot_files'] = [d3d_full_new_2021]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95': user_signals.q95,
-#                'qpsi_efitrt1': user_signals.qpsi_efitrt1,
-#              #  'pres_prime_profile': user_signals.pres_prime_profile,
-#                #'li': user_signals.li,
-#                'fs07': user_signals.fs07,
-#                'neped': user_signals.neped,
-#                'peped': user_signals.peped,
-#                'newid': user_signals.newid,
-#                'teped': user_signals.teped,
-#                'tewid': user_signals.tewid,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                #'ipdirect': user_signals.ipdirect,
-#             #   'iptarget': user_signals.iptarget,
-#             #   'iperr': user_signals.iperr,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#                'mpi66m322d_spec_profile': user_signals.mpi66m322d_spec_profile,
-#                'n1_rms': user_signals.n1_rms,
-#            #    'n2_rms_10': user_signals.n2_rms_10,
-#            #    'n3_rms_10': user_signals.n3_rms_10,
-#            }
-
-#        elif params['paths']['data'] in ['d3d_data_ped']:
-#            params['paths']['shot_files'] = [d3d_full_new_2021]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95': user_signals.q95,
-#                #'li': user_signals.li,
-#                'fs07': user_signals.fs07,
-#                'neped': user_signals.neped,
-#                'peped': user_signals.peped,
-#                'newid': user_signals.newid,
-#                'teped': user_signals.teped,
-#                'tewid': user_signals.tewid,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                #'ipdirect': user_signals.ipdirect,
-#             #   'iptarget': user_signals.iptarget,
-#             #   'iperr': user_signals.iperr,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#                'n1_rms': user_signals.n1_rms,
-#                'n2_rms_10': user_signals.n2_rms_10,
-#                'n3_rms_10': user_signals.n3_rms_10,
-#            }
-
-
-#        elif params['paths']['data'] in ['d3d_data_n1rms']:
-#            params['paths']['shot_files'] = [d3d_full_new]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95': user_signals.q95,
-#                'li': user_signals.li,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                'ipdirect': user_signals.ipdirect,
-#                'iptarget': user_signals.iptarget,
-#                'iperr': user_signals.iperr,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#                'n1_rms': user_signals.n1_rms,
-#                'n1_rms_no_shift': user_signals.n1_rms_no_shift,
-#            }
-
-#        elif params['paths']['data'] == 'd3d_data_new':
-#            params['paths']['shot_files'] = [d3d_full_new]
-#            params['paths']['shot_files_test'] = [] 
-#            params['paths']['use_signals_dict'] = {
-#                'q95': user_signals.q95,
-#                'li': user_signals.li,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                'ipdirect': user_signals.ipdirect,
-#                'iptarget': user_signals.iptarget,
-#                'iperr': user_signals.iperr,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#            }
-#        elif params['paths']['data'] == 'd3d_data_real_time':
-#            params['paths']['shot_files'] = [d3d_full_new]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95_EFITRT1': user_signals.q95_EFITRT1,
-#                'li': user_signals.li,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pradcore': user_signals.pradcore,
-#                'pradedge': user_signals.pradedge,
-#                'pin': user_signals.pin,
-#                'torquein': user_signals.torquein,
-#                'ipdirect': user_signals.ipdirect,
-#                'iptarget': user_signals.iptarget,
-#                'iperr': user_signals.iperr,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#            }
-#        elif params['paths']['data'] == 'd3d_data_real_time_0D':
-#            params['paths']['shot_files'] = [d3d_full_new]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'q95_EFITRT1': user_signals.q95_EFITRT1,
-#                'li': user_signals.li,
-#                'ip': user_signals.ip,
-#                'lm': user_signals.lm,
-#                'betan': user_signals.betan,
-#                'energy': user_signals.energy,
-#                'dens': user_signals.dens,
-#                'pin': user_signals.pin,
-#            #    'vd': user_signals.vd,
-#                'torquein': user_signals.torquein,
-#                'ipdirect': user_signals.ipdirect,
-#                'iptarget': user_signals.iptarget,
-#                'iperr': user_signals.iperr,
-#            }
-
-
-
-#        elif params['paths']['data'] == 'd3d_data_1D':
-#            params['paths']['shot_files'] = [d3d_full]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'ipdirect': user_signals.ipdirect,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#            }
-#        elif params['paths']['data'] == 'd3d_data_all_profiles':
-#            params['paths']['shot_files'] = [d3d_full]
-#            params['paths']['shot_files_test'] = []
-#            params['paths']['use_signals_dict'] = {
-#                'ipdirect': user_signals.ipdirect,
-#                'etemp_profile': user_signals.etemp_profile,
-#                'edens_profile': user_signals.edens_profile,
-#                'itemp_profile': user_signals.itemp_profile,
-#                'zdens_profile': user_signals.zdens_profile,
-#                'trot_profile': user_signals.trot_profile,
-#                'pthm_profile': user_signals.pthm_profile,
-#                'neut_profile': user_signals.neut_profile,
-#                'q_profile': user_signals.q_profile,
-#                'bootstrap_current_profile': user_signals.bootstrap_current_profile,
-#                'q_psi_profile': user_signals.q_psi_profile,
-#            }
         elif params['paths']['data'] == 'd3d_data_0D':
             params['paths']['shot_files'] = [d3d_full]
             params['paths']['shot_files_test'] = []

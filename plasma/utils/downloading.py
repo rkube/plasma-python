@@ -30,6 +30,11 @@ except ImportError:
 
 
 def get_missing_value_array():
+    """Marker for bad data.
+    
+    For any data that is missing, this array is written into the text file.
+    This array can be used when the data is loaded from file to check if the data is good or not.
+    """
     return np.array([-1.0])
 
 

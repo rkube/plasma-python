@@ -18,9 +18,9 @@ from plasma.primitives.channelsignal import ChannelSignal
 from plasma.primitives.machine import MachineD3D, MachineNSTX, MachineJET
 
 
-
+# List of all defined machines
 all_machines = [MachineD3D, MachineJET]
-
+# Number of channels to be used for all profiles
 profile_num_channels = 128
 
 # ZIPFIT comes from actual measurements
@@ -282,69 +282,120 @@ q95t = Signal(
 
 # "d3d/ipsip" was used before, ipspr15V seems to be available for a
 # superset of shots.
-ipsip = Signal("plasma current ipsip", ["jpf/da/c2-ipla", "/ipsip"],
+ipsip = Signal("plasma current ipsip", 
+               ["jpf/da/c2-ipla", "/ipsip"],
+               [MachineJET, MachineD3D], is_ip=True)
+
+ip = Signal("plasma current", 
+            ["jpf/da/c2-ipla", "/ipspr15V"],
             [MachineJET, MachineD3D], is_ip=True)
 
-ip = Signal("plasma current", ["jpf/da/c2-ipla", "/ipspr15V"],
-            [MachineJET, MachineD3D], is_ip=True)
-ipori = Signal("plasma current", ["jpf/da/c2-ipla", "/ipspr15V"],
-            [MachineJET, MachineD3D], is_ip=True)
+ipori = Signal("plasma current",
+               ["jpf/da/c2-ipla", "/ipspr15V"],
+               [MachineJET, MachineD3D], is_ip=True)
 
-ipt = Signal("plasma current tol", ["jpf/da/c2-ipla", "/ipsip"],
-            [MachineJET, MachineD3D], is_ip=True,data_avail_tolerances=[0.029, 0.029])
+ipt = Signal("plasma current tol", 
+             ["jpf/da/c2-ipla", "/ipsip"],
+             [MachineJET, MachineD3D], 
+             is_ip=True,
+             data_avail_tolerances=[0.029, 0.029])
 
-iptarget = Signal("plasma current target", ["/ipsiptargt"], [MachineD3D])
+iptarget = Signal("plasma current target", 
+                  ["/ipsiptargt"], 
+                  [MachineD3D])
 
-iptargett = Signal("plasma current target tol", ["/ipsiptargt"], [MachineD3D],data_avail_tolerances=[0.029])
+iptargett = Signal("plasma current target tol", 
+                   ["/ipsiptargt"],
+                   [MachineD3D],
+                   data_avail_tolerances=[0.029])
 
-iperr = Signal("plasma current error", ["/ipeecoil"], [MachineD3D])
+iperr = Signal("plasma current error",
+               ["/ipeecoil"],
+               [MachineD3D])
 
-iperrt = Signal("plasma current error tol", ["/ipeecoil"], [MachineD3D],data_avail_tolerances=[0.029])
+iperrt = Signal("plasma current error tol",
+                ["/ipeecoil"],
+                [MachineD3D],
+                data_avail_tolerances=[0.029])
 
-li = Signal("internal inductance", ["jpf/gs/bl-li<s", "/efsli"], [MachineJET, MachineD3D])
-
-lit = Signal("internal inductance tol", ["jpf/gs/bl-li<s", "/efsli"], [MachineJET, MachineD3D],data_avail_tolerances=[0.029, 0.029])
-
-lm = Signal("Locked mode amplitude", ['jpf/da/c2-loca', '/dusbradial'],
+li = Signal("internal inductance",
+            ["jpf/gs/bl-li<s", "/efsli"],
             [MachineJET, MachineD3D])
 
-lmt = Signal("Locked mode amplitude tol", ['jpf/da/c2-loca', '/dusbradial'],
-            [MachineJET, MachineD3D],data_avail_tolerances=[0.029, 0.029])
+lit = Signal("internal inductance tol", ["jpf/gs/bl-li<s", "/efsli"],
+             [MachineJET, MachineD3D],
+             data_avail_tolerances=[0.029, 0.029])
 
-n1_rms = Signal("n1 finite frequency signals",['mhd/mirnov.n1rms'],[MachineD3D],data_avail_tolerances=[0.029],causal_shifts=10)
+lm = Signal("Locked mode amplitude",
+            ['jpf/da/c2-loca', '/dusbradial'],
+            [MachineJET, MachineD3D])
 
-n2_rms_10 = Signal("n2 finite frequency signals_10ms",['mhd/mirnov.n2rms'],[MachineD3D],data_avail_tolerances=[0.029],causal_shifts=10)
+lmt = Signal("Locked mode amplitude tol", 
+             ['jpf/da/c2-loca', '/dusbradial'],
+             [MachineJET, MachineD3D],
+             data_avail_tolerances=[0.029, 0.029])
 
-n3_rms_10 = Signal("n3 finite frequency signals_10ms",['mhd/mirnov.n3rms'],[MachineD3D],data_avail_tolerances=[0.029],causal_shifts=10)
+n1_rms = Signal("n1 finite frequency signals",
+                ['mhd/mirnov.n1rms'],
+                [MachineD3D],
+                data_avail_tolerances=[0.029],
+                causal_shifts=10)
 
-n1_rms_no_shift = Signal("n1 finite frequency signals no shift",['mhd/mirnov.n1rms'],[MachineD3D],data_avail_tolerances=[0.029])
+n2_rms_10 = Signal("n2 finite frequency signals_10ms",
+                   ['mhd/mirnov.n2rms'],
+                   [MachineD3D],
+                   data_avail_tolerances=[0.029],
+                   causal_shifts=10)
 
-dens = Signal("Plasma density", ['jpf/df/g1r-lid:003', '/dssdenest'],
-              [MachineJET, MachineD3D], is_strictly_positive=True)
+n3_rms_10 = Signal("n3 finite frequency signals_10ms",
+                   ['mhd/mirnov.n3rms'],
+                   [MachineD3D],
+                   data_avail_tolerances=[0.029],
+                   causal_shifts=10)
 
-denst = Signal("Plasma density tol", ['jpf/df/g1r-lid:003', '/dssdenest'],
-              [MachineJET, MachineD3D], is_strictly_positive=True,data_avail_tolerances=[0.029, 0.029])
+n1_rms_no_shift = Signal("n1 finite frequency signals no shift",
+                         ['mhd/mirnov.n1rms'],
+                         [MachineD3D],
+                         data_avail_tolerances=[0.029])
 
-energy = Signal("stored energy", ['jpf/gs/bl-wmhd<s', '/efswmhd'],
+dens = Signal("Plasma density",
+              ['jpf/df/g1r-lid:003', '/dssdenest'],
+              [MachineJET, MachineD3D],
+              is_strictly_positive=True)
+
+denst = Signal("Plasma density tol",
+               ['jpf/df/g1r-lid:003', '/dssdenest'],
+               [MachineJET, MachineD3D],
+               is_strictly_positive=True,
+               data_avail_tolerances=[0.029, 0.029])
+
+energy = Signal("stored energy",
+                ['jpf/gs/bl-wmhd<s', '/efswmhd'],
                 [MachineJET, MachineD3D])
 
-energyt = Signal("stored energy tol", ['jpf/gs/bl-wmhd<s', '/efswmhd'],
-                [MachineJET, MachineD3D],data_avail_tolerances=[0.029, 0.029])
-# Total beam input power
-pin = Signal("Input Power (beam for MachineD3D)", ['jpf/gs/bl-ptot<s', '/bmspinj'],
+energyt = Signal("stored energy tol",
+                 ['jpf/gs/bl-wmhd<s', '/efswmhd'],
+                 [MachineJET, MachineD3D],
+                 data_avail_tolerances=[0.029, 0.029])
+
+pin = Signal("Input Power (beam for MachineD3D)",
+             ['jpf/gs/bl-ptot<s', '/bmspinj'],
              [MachineJET, MachineD3D])
-pint = Signal("Input Power (beam for MachineD3D) tol", ['jpf/gs/bl-ptot<s', '/bmspinj'],
-             [MachineJET, MachineD3D],data_avail_tolerances=[0.029, 0.029])
 
-pradtot = Signal("Radiated Power", ['jpf/db/b5r-ptot>out'], [MachineJET])
+pint = Signal("Input Power (beam for MachineD3D) tol",
+              ['jpf/gs/bl-ptot<s', '/bmspinj'],
+              [MachineJET, MachineD3D],
+              data_avail_tolerances=[0.029, 0.029])
 
-pradtott = Signal("Radiated Power tol", ['jpf/db/b5r-ptot>out'], [MachineJET],data_avail_tolerances=[0.029])
-# pradtot = Signal("Radiated Power", ['jpf/db/b5r-ptot>out',
-# 'MachineD3D/'+r'\prad_tot'], [MachineJET,MachineD3D])
-# pradcore = ChannelSignal("Radiated Power Core", [ 'MachineD3D/' + r'\bol_l15_p']
-# ,[MachineD3D])
-# pradedge = ChannelSignal("Radiated Power Edge", ['MachineD3D/' + r'\bol_l03_p'],
-# [MachineD3D])
+pradtot = Signal("Radiated Power",
+                 ['jpf/db/b5r-ptot>out'],
+                 [MachineJET])
+
+pradtott = Signal("Radiated Power tol",
+                  ['jpf/db/b5r-ptot>out'],
+                  [MachineJET],
+                  data_avail_tolerances=[0.029])
+ 
 pradcore = ChannelSignal("Radiated Power Core",
                          ['ppf/bolo/kb5h/channel14', '/' + r'\bol_l15_p'],
                          [MachineJET, MachineD3D])
@@ -355,30 +406,28 @@ pradedge = ChannelSignal("Radiated Power Edge",
 
 pradcoret = ChannelSignal("Radiated Power Core tol",
                          ['ppf/bolo/kb5h/channel14', '/' + r'\bol_l15_p'],
-                         [MachineJET, MachineD3D],data_avail_tolerances=[0.029, 0.029])
+                         [MachineJET, MachineD3D],
+                         data_avail_tolerances=[0.029, 0.029])
 
 pradedget = ChannelSignal("Radiated Power Edge tol" ,
                          ['ppf/bolo/kb5h/channel10', '/' + r'\bol_l03_p'],
-                         [MachineJET, MachineD3D],data_avail_tolerances=[0.029, 0.029])
-
-# pechin = Signal("ECH input power, not always on", ['MachineD3D/pcechpwrf'], [MachineD3D])
+                         [MachineJET, MachineD3D],
+                         data_avail_tolerances=[0.029, 0.029])
 
 pechin = Signal("ECH input power, not always on",
-                ['RF/ECH.TOTAL.ECHPWRC'], [MachineD3D])
+                ['RF/ECH.TOTAL.ECHPWRC'], 
+                [MachineD3D])
 
 pechint = Signal("ECH input power, not always on tol",
-                ['RF/ECH.TOTAL.ECHPWRC'], [MachineD3D],data_avail_tolerances=[0.029])
-
-# betan = Signal("Normalized Beta", ['jpf/gs/bl-bndia<s', 'MachineD3D/efsbetan'],
-
-# [MachineJET, MachineD3D])
+                ['RF/ECH.TOTAL.ECHPWRC'], 
+                [MachineD3D],
+                data_avail_tolerances=[0.029])
 
 betan = Signal("Normalized Beta", ['/efsbetan'], [MachineD3D])
 
-betant = Signal("Normalized Beta tol", ['/efsbetan'], [MachineD3D],data_avail_tolerances=[0.029])
+betant = Signal("Normalized Beta tol", ['/efsbetan'], [MachineD3D], data_avail_tolerances=[0.029])
 
-energydt = Signal(
-    "stored energy time derivative", ['jpf/gs/bl-fdwdt<s'], [MachineJET])
+energydt = Signal("stored energy time derivative", ['jpf/gs/bl-fdwdt<s'], [MachineJET])
 
 torquein = Signal("Input Beam Torque", ['/bmstinj'], [MachineD3D])
 
@@ -396,21 +445,17 @@ tewid = Signal("tewid", ['/prmtan_tewid'], [MachineD3D])
 
 torqueint = Signal("Input Beam Torque tol", ['/bmstinj'], [MachineD3D],data_avail_tolerances=[0.029])
 
-tmamp1 = Signal("Tearing Mode amplitude (rotating 2/1)", ['/nssampn1l'],
-                [MachineD3D])
+tmamp1 = Signal("Tearing Mode amplitude (rotating 2/1)", ['/nssampn1l'], [MachineD3D])
 
-tmamp2 = Signal("Tearing Mode amplitude (rotating 3/2)", ['/nssampn2l'],
-                [MachineD3D])
+tmamp2 = Signal("Tearing Mode amplitude (rotating 3/2)", ['/nssampn2l'], [MachineD3D])
 
-tmfreq1 = Signal("Tearing Mode frequency (rotating 2/1)", ['/nssfrqn1l'],
-                 [MachineD3D])
+tmfreq1 = Signal("Tearing Mode frequency (rotating 2/1)", ['/nssfrqn1l'], [MachineD3D])
 
-tmfreq2 = Signal("Tearing Mode frequency (rotating 3/2)", ['/nssfrqn2l'],
-                 [MachineD3D])
+tmfreq2 = Signal("Tearing Mode frequency (rotating 3/2)", ['/nssfrqn2l'], [MachineD3D])
 
 ipdirect = Signal("plasma current direction", ["/iptdirect"], [MachineD3D])
 
-ipdirectt = Signal("plasma current direction tol", ["/iptdirect"], [MachineD3D],data_avail_tolerances=[0.029])
+ipdirectt = Signal("plasma current direction tol", ["/iptdirect"], [MachineD3D], data_avail_tolerances=[0.029])
 
 # for downloading, modify this to preprocess shots with only a subset of
 # signals. This may produce more shots
@@ -418,13 +463,13 @@ ipdirectt = Signal("plasma current direction tol", ["/iptdirect"], [MachineD3D],
 
 #############################################################################################
 #                                                                                           #
-#                                Define collection os signals                               #
+#                                Define groups of signals                                   #
 #                                                                                           #
 #############################################################################################
 # Restricted subset to those signals that are present for most shots. The
 # idea is to remove signals that cause many shots to be dropped from the
 # dataset.
-all_signals_gar18 = {
+signal_group_gar18 = {
     'q95t': q95t, 'lit': lit, 'ipt': ipt, 'betant': betant, 'energyt': energyt, 'lmt': lmt,
     'denst': denst, 'pradcoret': pradcoret,
     'pradedget': pradedget, 'pint': pint,
@@ -434,7 +479,7 @@ all_signals_gar18 = {
     'etemp_profilet': etemp_profilet, 'edens_profilet': edens_profilet,
 }
 
-all_signals_real_time={
+signal_group_real_time={
     'q95_EFITRT1': q95_EFITRT1, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -446,7 +491,7 @@ all_signals_real_time={
     # 'rho_profile_spatial':rho_profile_spatial, 'etemp':etemp,
     'etemp_profile': etemp_profile, 'edens_profile': edens_profile,
 }
-all_signals_real_time_0D={
+signal_group_real_time_0D={
     'q95_EFITRT1': q95_EFITRT1, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -474,7 +519,7 @@ all_signals = {
     # 'bootstrap_current_profile':bootstrap_current_profile,
     # 'q_psi_profile':q_psi_profile}
 }
-all_signals_ori = {
+signal_group_ori = {
     'q95': q95, 'li': li, 'ipori': ipori, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -482,7 +527,8 @@ all_signals_ori = {
     'energydt': energydt, 'ipdirect': ipdirect, 'iptarget': iptarget,
     'iperr': iperr,
     'etemp_profile': etemp_profile, 'edens_profile': edens_profile}
-all_signals_n1rms = {
+
+signal_group_n1rms = {
     'n1_rms_no_shift':n1_rms_no_shift,'n1_rms':n1_rms,'q95': q95, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -491,7 +537,8 @@ all_signals_n1rms = {
     'iperr': iperr,
     'etemp_profile': etemp_profile, 'edens_profile': edens_profile,
 }
-all_signals_n1rms_thomson = {
+
+signal_group_n1rms_thomson = {
     'n1_rms_no_shift':n1_rms_no_shift,'n1_rms':n1_rms,'q95_EFITRT1': q95_EFITRT1, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -502,7 +549,7 @@ all_signals_n1rms_thomson = {
     'etemp_profile_thomson': etemp_profile_thomson, 'edens_profile_thomson': edens_profile_thomson,
 }
 
-all_signals_fs07 = {
+signal_group_fs07 = {
     'n1_rms_no_shift':n1_rms_no_shift,'n1_rms':n1_rms,'q95': q95, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,'fs07':fs07,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -512,7 +559,7 @@ all_signals_fs07 = {
     'etemp_profile': etemp_profile, 'edens_profile': edens_profile,
 }
 
-all_signals_ped_old_2021 = {
+signal_group_ped_old_2021 = {
     'n1_rms_no_shift':n1_rms_no_shift,'n1_rms':n1_rms,'q95': q95, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,'fs07':fs07,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -526,7 +573,8 @@ all_signals_ped_old_2021 = {
     'iperr': iperr,
     'etemp_profile': etemp_profile, 'edens_profile': edens_profile,
 }
-all_signals_ped = {
+
+signal_group_ped = {
      'n1_rms':n1_rms,'n2_rms_10':n2_rms_10,'n3_rms_10':n3_rms_10,
      'q95': q95, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,'fs07':fs07,
@@ -544,7 +592,7 @@ all_signals_ped = {
 }
 
 
-all_signals_ped_spec = { 'qmin':qmin,
+signal_group_ped_spec = { 'qmin':qmin,
      'n1_rms':n1_rms,'n2_rms_10':n2_rms_10,'n3_rms_10':n3_rms_10,
      'q95': q95, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,'fs07':fs07,
@@ -562,8 +610,7 @@ all_signals_ped_spec = { 'qmin':qmin,
 }
 
 
-
-all_signals_n1rms_qmin = {'qmin':qmin,
+signal_group_n1rms_qmin = {'qmin':qmin,
     'n1_rms_no_shift':n1_rms_no_shift,'n1_rms':n1_rms,'q95': q95, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -573,7 +620,7 @@ all_signals_n1rms_qmin = {'qmin':qmin,
     'etemp_profile': etemp_profile, 'edens_profile': edens_profile,
 }
 
-all_signals_thomson = {
+signal_group_thomson = {
     'q95': q95, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -586,98 +633,64 @@ all_signals_thomson = {
 
 
 
-# new signals are not downloaded yet
 
-
-# for actual data analysis
-# all_signals_restricted = [q95, li, ip, energy, lm, dens, pradcore, pradtot,
-# pin, etemp_profile, edens_profile]
-
-all_signals_restricted = all_signals
-
-#g.print_unique('All signals (determines which signals are downloaded'
-#               ' & preprocessed):')
-#g.print_unique(all_signals.values())
-
+signal_group_restricted = signal_group
 
 fully_defined_signals = {
-    sig_name: sig for (sig_name, sig) in all_signals_restricted.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
         sig.is_defined_on_machines(all_machines))
 }
+
 fully_defined_signals_0D = {
-    sig_name: sig for (sig_name, sig) in all_signals_restricted.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
         sig.is_defined_on_machines(all_machines) and sig.num_channels == 1)
 }
 fully_defined_signals_1D = {
-    sig_name: sig for (sig_name, sig) in all_signals_restricted.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
         sig.is_defined_on_machines(all_machines) and sig.num_channels > 1)
 }
 d3d_signals = {
-    sig_name: sig for (sig_name, sig) in all_signals_restricted.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
         sig.is_defined_on_machine(MachineD3D))
 }
 d3d_signals_n1rms = {
-    sig_name: sig for (sig_name, sig) in all_signals_n1rms.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_n1rms.items() if (
         sig.is_defined_on_machine(MachineD3D))
 }
 d3d_signals_fs07 = {
-    sig_name: sig for (sig_name, sig) in all_signals_fs07.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_fs07.items() if (
         sig.is_defined_on_machine(MachineD3D))
 }
 d3d_signals_ped = {
-    sig_name: sig for (sig_name, sig) in all_signals_ped.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_ped.items() if (
         sig.is_defined_on_machine(MachineD3D))
 }
 d3d_signals_ped_spec = {
-    sig_name: sig for (sig_name, sig) in all_signals_ped_spec.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_ped_spec.items() if (
         sig.is_defined_on_machine(MachineD3D))
 }
 d3d_signals_gar18 = {
-    sig_name: sig for (sig_name, sig) in all_signals_gar18.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_gar18.items() if (
         sig.is_defined_on_machine(MachineD3D))
 }
 d3d_signals_0D = {
-    sig_name: sig for (sig_name, sig) in all_signals_restricted.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
         (sig.is_defined_on_machine(MachineD3D) and sig.num_channels == 1))
 }
 d3d_signals_1D = {
-    sig_name: sig for (sig_name, sig) in all_signals_restricted.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
         (sig.is_defined_on_machine(MachineD3D) and sig.num_channels > 1))
 }
 
 jet_signals = {
-    sig_name: sig for (sig_name, sig) in all_signals_restricted.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
         sig.is_defined_on_machine(MachineJET))
 }
 jet_signals_0D = {
-    sig_name: sig for (sig_name, sig) in all_signals_restricted.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
         (sig.is_defined_on_machine(MachineJET) and sig.num_channels == 1))
 }
 jet_signals_1D = {
-    sig_name: sig for (sig_name, sig) in all_signals_restricted.items() if (
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
         (sig.is_defined_on_machine(MachineJET) and sig.num_channels > 1))
 }
-
-# ['pcechpwrf'] #Total ECH Power Not always on!
-# ## 0D EFIT signals ###
-# signal_paths += ['EFIT02/RESULTS.AEQDSK.Q95']
-
-# ## 1D EFIT signals ###
-# the other signals give more reliable data
-# signal_paths += [
-#  # Note, the following signals are uniformly mapped over time
-# 'AOT/EQU.t_e', # electron temperature profile vs rho
-# 'AOT/EQU.dens_e'] # electron density profile vs rho
-
-
-# [[' $I_{plasma}$ [A]'],
-# [' Mode L. A. [A]'],
-# [' $P_{radiated}$ [W]'],
-# [' $P_{radiated}$ [W]'],
-# [' $\rho_{plasma}$ [m^-2]'],
-# [' $L_{plasma,internal}$'],
-# ['$\frac{d}{dt} E_{D}$ [W]'],
-# [' $P_{input}$ [W]'],
-# ['$E_{D}$'],
-# ppf signal labels
-# ['ECE unit?']]

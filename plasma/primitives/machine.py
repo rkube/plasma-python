@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 
+from xml.dom import NotFoundErr
+import numpy as np
+import sys
+import logging
+
+from plasma.utils.errors import SignalNotFoundError
 
 """Machine definitions
 
@@ -33,9 +39,6 @@ class Machine():
                            shot phase for this machine.
         """
         assert(current_threshold > 0.0)
-
-#    def get_connection(self):
-#        return Connection(self.server)
 
     def __eq__(self, other):
         """Equality is defined by matching names"""
@@ -80,8 +83,7 @@ class MachineNSTX(Machine):
         Returns:
           time: Time base for the desired signal
           data: Data of requested signal
-          None: Legact
-          found: True
+          None: Legacy
         """
         assert(shot_num > 0)
 
@@ -89,8 +91,8 @@ class MachineNSTX(Machine):
         c.openTree(tree, shot_num)
         data = c.get(tag).data()
         time = c.get('dim_of(' + tag + ')').data()
-        found = True
-        return time, data, None, found
+
+        return time, data, None
 
 
 class MachineJET(Machine):
@@ -114,30 +116,19 @@ class MachineJET(Machine):
           None: Legact
           found: True
         """
-        found = False
         time = np.array([0])
         ydata = None
         data = np.array([0])
-        try:
-            data = c.get('_sig=jet("{}/",{})'.format(signal_path, shot_num)).data()
-            if np.ndim(data) == 2:
-                data = np.transpose(data)
-                time = c.get(
-                    '_sig=dim_of(jet("{}/",{}),1)'.format(
-                        signal_path, shot_num)).data()
-                ydata = c.get(
-                    '_sig=dim_of(jet("{}/",{}),0)'.format(
-                        signal_path, shot_num)).data()
-            else:
-                time = c.get(
-                    '_sig=dim_of(jet("{}/",{}))'.format(
-                        signal_path, shot_num)).data()
-            found = True
-        except Exception as e:
-            g.print_unique(e)
-            sys.stdout.flush()
-            # pass
-        return time, data, ydata, found
+
+        data = c.get(f'_sig=jet("{signal_path}/",{shot_num})').data()
+        if np.ndim(data) == 2:
+            data = np.transpose(data)
+            time = c.get(f'_sig=dim_of(jet("{signal_path}/",{shot_num}),1)').data()
+            ydata = c.get(f'_sig=dim_of(jet("{signal_path}/",{shot_num}),0)').data()
+        else:
+            time = c.get('_sig=dim_of(jet("{signal_pat}/",{shot_num}))').data()
+
+        return time, data, ydata
 
 
 class MachineD3D(Machine):
@@ -172,7 +163,7 @@ class MachineD3D(Machine):
         # first try, retrieve directly from tree andsignal
         def get_units(str):
             units = c.get('units_of('+str+')').data()
-            if units == '' or units == ' ':
+            if units in ["", " "]:
                 units = c.get('units('+str+')').data()
             return units
 
@@ -184,8 +175,8 @@ class MachineD3D(Machine):
             found = True
 
         except Exception as e:
-            g.print_unique(e)
-            sys.stdout.flush()
+            logging.error(e)
+            raise(e)
             pass
 
         # Retrieve data from PTDATA if node not found
@@ -195,6 +186,7 @@ class MachineD3D(Machine):
             if len(data) != 1:
                 rank = np.ndim(data)
                 found = True
+
         # Retrieve data from Pseudo-pointname if not in ptdata
         if not found:
             # g.print_unique("not in PTDATA {}".format(signal))
@@ -204,19 +196,17 @@ class MachineD3D(Machine):
                 found = True
         # this means the signal wasn't found
         if not found:
-            g.print_unique("No such signal: {}".format(signal))
-            pass
+            raise SignalNotFoundError(f"No such signal: {signal}")
 
         # get time base
-        if found:
-            if rank > 1:
-                xdata = c.get('dim_of(_s,1)').data()
-                # xunits = get_units('dim_of(_s,1)')
-                ydata = c.get('dim_of(_s)').data()
-                # yunits = get_units('dim_of(_s)')
-            else:
-                xdata = c.get('dim_of(_s)').data()
-                # xunits = get_units('dim_of(_s)')
+        if rank > 1:
+            xdata = c.get('dim_of(_s,1)').data()
+            # xunits = get_units('dim_of(_s,1)')
+            ydata = c.get('dim_of(_s)').data()
+            # yunits = get_units('dim_of(_s)')
+        else:
+            xdata = c.get('dim_of(_s)').data()
+            # xunits = get_units('dim_of(_s)')
 
         # MDSplus seems to return 2-D arrays transposed.  Change them back.
         if np.ndim(data) == 2:
@@ -226,9 +216,8 @@ class MachineD3D(Machine):
         if np.ndim(xdata) == 2:
             xdata = np.transpose(xdata)
 
-        # print('   GADATA Retrieval Time : ', time.time() - t0)
-        xdata = xdata*1e-3  # time is measued in ms
-        return xdata, data, ydata, found
+        xdata = xdata * 1e-3  # time is measued in ms
+        return xdata, data, ydata
 
 
 
