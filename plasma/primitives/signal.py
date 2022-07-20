@@ -29,16 +29,37 @@ class Signal():
         """Initialize a signal
         
         Args:
-          description: (string) String description of the signal
-          paths: (string)
-          machines: (machine) Type of machine on which this signal is defined
-          tex_label: (string) Label used in plots
-          causal_shifts: ???
-          is_ip: ???
-          normalize: (bool) If true, normalize this data in preprocessing. If False, skip normalization
-          data_avail_tolerances:
-          is_strictly_positive: (bool): If true, this data can not have negative values
-          mapping_paths: ???
+            description: (string) String description of the signal
+            paths: (string)
+            machines: (list(machine)) List of machines on which this signal is defined
+            tex_label: (string) Label used in plots
+            causal_shifts: ???
+            is_ip: ???
+            normalize: (bool) If true, normalize this data in preprocessing. If False, skip normalization
+            data_avail_tolerances:
+            is_strictly_positive: (bool): If true, this data can not have negative values
+            mapping_paths: ???
+
+        Attributes:
+            description: (string) String description of the signal
+            paths: (string)
+            machines: (list(machine)) List of machines on which this signal is defined
+            tex_label: (string) Label used in plots
+            causal_shifts: ???
+            is_ip: ???
+            normalize: (bool) If true, normalize this data in preprocessing. If False, skip normalization
+            data_avail_tolerances:
+            is_strictly_positive: (bool): If true, this data can not have negative values
+            mapping_paths: ???
+
+
+        Besides representing a signal, this class also includes methods to fetch the data.
+        The methods _load_data_from_txt_safe and load_data allow to read in data from txt files.
+        The method _fetch_data_basic allows to fetch the data using data access methods specified
+        for the individual machines.
+
+        TODO: Refactor the data loading mechanism.
+
         
         """
         assert(len(paths) == len(machines))
@@ -68,12 +89,12 @@ class Signal():
         """Loads signal for given machine and shot number.
     
         Args:
-        prepath: string, Base path, conf['paths']['base_path']
-        machine machine, Type of machine (D3D, NSTX, Jet...)
-        shot_number: int, Unique shot identifier
+            prepath: string, Base path, conf['paths']['base_path']
+            machine machine, Type of machine (D3D, NSTX, Jet...)
+            shot_number: int, Unique shot identifier
 
         Returns:
-        ???: No idea
+            ???: No idea
 
         Constructs the filename for a signal. Format:
         prepath/machine.name/signal.dirname/shot_number
@@ -91,19 +112,19 @@ class Signal():
         """Safely load signal data from a stored txt file.
 
         Args:
-          prepath:
-          shot:
-          dtype:
+            prepath:
+            shot:
+            dtype:
 
         Returns:
-          data: ndarray(float) Signal data 
+            data: ndarray(float) Signal data
 
         Raises
-          NotDownloadedError when the signal was not downloaded.
-          SignalCorruptedError when the file has zero size, or missing_value_array was written to the file.
+            NotDownloadedError when the signal was not downloaded.
+            SignalCorruptedError when the file has zero size, or missing_value_array was written to the file.
 
         This method acts as a safe wrapper around np.loadtxt and adds additional error handling.
-        The base class and all derived classes call this method to perform additional data
+        Bbase classes and all derived classes call this method to perform additional data
         manipulation for tasks downstream.
 
         """
@@ -143,7 +164,7 @@ class Signal():
         
         
         """
-        data = self._load_data_from_txt_safe(prepath, shot)
+        data = self._load_data_from_txt_safe(prepath, shot, dtype)
 
         if np.ndim(data) == 1:
             data = np.expand_dims(data, axis=0)

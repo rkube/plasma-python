@@ -35,10 +35,17 @@ class Machine():
         """Initializes Machine object
 
         Args:
-        current_threshold: Minimum value of the plasma current that defines the active
-                           shot phase for this machine.
+            current_threshold: Minimum value of the plasma current that defines the active
+                               shot phase for this machine.
+
+        Attributes:
+            current_threshold: Minimum value of the plasma current that defines the active
+                               shot phase for this machine.
+
         """
         assert(current_threshold > 0.0)
+
+        self.current_threshold = current_threshold
 
     def __eq__(self, other):
         """Equality is defined by matching names"""
@@ -66,10 +73,9 @@ class Machine():
 
 class MachineNSTX(Machine):
     def __init__(self, current_threshold=2e-1):
-        super.__init__(self, current_threshold)
+        super(MachineNSTX, self).__init__(current_threshold)
         self.name = "NSTX"
         self.server = "skylark.pppl.gov:8501::"
-        self.current_threshold = current_threshold
 
 
     def fetch_data(signal_path, shot_num, c):
@@ -83,7 +89,6 @@ class MachineNSTX(Machine):
         Returns:
           time: Time base for the desired signal
           data: Data of requested signal
-          None: Legacy
         """
         assert(shot_num > 0)
 
@@ -92,15 +97,15 @@ class MachineNSTX(Machine):
         data = c.get(tag).data()
         time = c.get('dim_of(' + tag + ')').data()
 
-        return time, data, None
+        return time, data
 
 
 class MachineJET(Machine):
     """JET Machine."""
     def __init__(self, current_threshold=1e5):
+        super(MachineJET, self).__init__(current_threshold)
         self.name = "JET"
         self.server = "mdsplus.jet.efda.org"
-        self.current_threshold = current_threshold
 
     def fetch_data(self, signal_path, shot_num, c):
         """Fetch JET data 
@@ -113,8 +118,7 @@ class MachineJET(Machine):
         Returns:
           time: Time base for the desired signal
           data: Data of requested signal
-          None: Legact
-          found: True
+          ydata: True
         """
         time = np.array([0])
         ydata = None
@@ -133,7 +137,12 @@ class MachineJET(Machine):
 
 class MachineD3D(Machine):
     """D3D Machine."""
-    def fetch_data(self, signal_path, shot_num, c):
+    def __init__(self, current_threshold=2e-1):
+        super(MachineD3D, self).__init__(current_threshold)
+        self.name = "D3D"
+        self.server = "atlas.gat.com"
+
+    def fetch_data(MachineD3D, signal_path, shot_num, c):
         """Fetch D3D data 
 
         Args:
