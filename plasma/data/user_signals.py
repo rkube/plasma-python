@@ -283,55 +283,55 @@ q95t = Signal(
 # "d3d/ipsip" was used before, ipspr15V seems to be available for a
 # superset of shots.
 ipsip = Signal("plasma current ipsip", 
-               ["jpf/da/c2-ipla", "/ipsip"],
+               ["jpf/da/c2-ipla", "ipsip"],
                [MachineJET, MachineD3D], is_ip=True)
 
 ip = Signal("plasma current", 
-            ["jpf/da/c2-ipla", "/ipspr15V"],
+            ["jpf/da/c2-ipla", "ipspr15V"],
             [MachineJET, MachineD3D], is_ip=True)
 
 ipori = Signal("plasma current",
-               ["jpf/da/c2-ipla", "/ipspr15V"],
+               ["jpf/da/c2-ipla", "ipspr15V"],
                [MachineJET, MachineD3D], is_ip=True)
 
 ipt = Signal("plasma current tol", 
-             ["jpf/da/c2-ipla", "/ipsip"],
+             ["jpf/da/c2-ipla", "ipsip"],
              [MachineJET, MachineD3D], 
              is_ip=True,
              data_avail_tolerances=[0.029, 0.029])
 
 iptarget = Signal("plasma current target", 
-                  ["/ipsiptargt"], 
+                  ["ipsiptargt"],
                   [MachineD3D])
 
 iptargett = Signal("plasma current target tol", 
-                   ["/ipsiptargt"],
+                   ["ipsiptargt"],
                    [MachineD3D],
                    data_avail_tolerances=[0.029])
 
 iperr = Signal("plasma current error",
-               ["/ipeecoil"],
+               ["ipeecoil"],
                [MachineD3D])
 
 iperrt = Signal("plasma current error tol",
-                ["/ipeecoil"],
+                ["ipeecoil"],
                 [MachineD3D],
                 data_avail_tolerances=[0.029])
 
 li = Signal("internal inductance",
-            ["jpf/gs/bl-li<s", "/efsli"],
+            ["jpf/gs/bl-li<s", "efsli"],
             [MachineJET, MachineD3D])
 
-lit = Signal("internal inductance tol", ["jpf/gs/bl-li<s", "/efsli"],
+lit = Signal("internal inductance tol", ["jpf/gs/bl-li<s", "efsli"],
              [MachineJET, MachineD3D],
              data_avail_tolerances=[0.029, 0.029])
 
 lm = Signal("Locked mode amplitude",
-            ['jpf/da/c2-loca', '/dusbradial'],
+            ['jpf/da/c2-loca', 'dusbradial'],
             [MachineJET, MachineD3D])
 
 lmt = Signal("Locked mode amplitude tol", 
-             ['jpf/da/c2-loca', '/dusbradial'],
+             ['jpf/da/c2-loca', 'dusbradial'],
              [MachineJET, MachineD3D],
              data_avail_tolerances=[0.029, 0.029])
 
@@ -359,31 +359,31 @@ n1_rms_no_shift = Signal("n1 finite frequency signals no shift",
                          data_avail_tolerances=[0.029])
 
 dens = Signal("Plasma density",
-              ['jpf/df/g1r-lid:003', '/dssdenest'],
+              ['jpf/df/g1r-lid:003', 'dssdenest'],
               [MachineJET, MachineD3D],
               is_strictly_positive=True)
 
 denst = Signal("Plasma density tol",
-               ['jpf/df/g1r-lid:003', '/dssdenest'],
+               ['jpf/df/g1r-lid:003', 'dssdenest'],
                [MachineJET, MachineD3D],
                is_strictly_positive=True,
                data_avail_tolerances=[0.029, 0.029])
 
 energy = Signal("stored energy",
-                ['jpf/gs/bl-wmhd<s', '/efswmhd'],
+                ['jpf/gs/bl-wmhd<s', 'efswmhd'],
                 [MachineJET, MachineD3D])
 
 energyt = Signal("stored energy tol",
-                 ['jpf/gs/bl-wmhd<s', '/efswmhd'],
+                 ['jpf/gs/bl-wmhd<s', 'efswmhd'],
                  [MachineJET, MachineD3D],
                  data_avail_tolerances=[0.029, 0.029])
 
 pin = Signal("Input Power (beam for MachineD3D)",
-             ['jpf/gs/bl-ptot<s', '/bmspinj'],
+             ['jpf/gs/bl-ptot<s', 'bmspinj'],
              [MachineJET, MachineD3D])
 
 pint = Signal("Input Power (beam for MachineD3D) tol",
-              ['jpf/gs/bl-ptot<s', '/bmspinj'],
+              ['jpf/gs/bl-ptot<s', 'bmspinj'],
               [MachineJET, MachineD3D],
               data_avail_tolerances=[0.029, 0.029])
 
@@ -423,39 +423,39 @@ pechint = Signal("ECH input power, not always on tol",
                 [MachineD3D],
                 data_avail_tolerances=[0.029])
 
-betan = Signal("Normalized Beta", ['/efsbetan'], [MachineD3D])
+betan = Signal("Normalized Beta", ['efsbetan'], [MachineD3D])
 
-betant = Signal("Normalized Beta tol", ['/efsbetan'], [MachineD3D], data_avail_tolerances=[0.029])
+betant = Signal("Normalized Beta tol", ['efsbetan'], [MachineD3D], data_avail_tolerances=[0.029])
 
 energydt = Signal("stored energy time derivative", ['jpf/gs/bl-fdwdt<s'], [MachineJET])
 
 torquein = Signal("Input Beam Torque", ['/bmstinj'], [MachineD3D])
 
-fs07 = Signal("filterscope fs07", ['/fs07'], [MachineD3D])
+fs07 = Signal("filterscope fs07", ['fs07'], [MachineD3D])
 
-neped = Signal("neped", ['/prmtan_neped'], [MachineD3D])
+neped = Signal("neped", ['prmtan_neped'], [MachineD3D])
 
-newid = Signal("newid", ['/prmtan_newid'], [MachineD3D])
+newid = Signal("newid", ['prmtan_newid'], [MachineD3D])
 
-peped = Signal("peped", ['/prmtan_peped'], [MachineD3D])
+peped = Signal("peped", ['prmtan_peped'], [MachineD3D])
 
-teped = Signal("teped", ['/prmtan_teped'], [MachineD3D])
+teped = Signal("teped", ['prmtan_teped'], [MachineD3D])
 
-tewid = Signal("tewid", ['/prmtan_tewid'], [MachineD3D])
+tewid = Signal("tewid", ['prmtan_tewid'], [MachineD3D])
 
-torqueint = Signal("Input Beam Torque tol", ['/bmstinj'], [MachineD3D],data_avail_tolerances=[0.029])
+torqueint = Signal("Input Beam Torque tol", ['bmstinj'], [MachineD3D],data_avail_tolerances=[0.029])
 
-tmamp1 = Signal("Tearing Mode amplitude (rotating 2/1)", ['/nssampn1l'], [MachineD3D])
+tmamp1 = Signal("Tearing Mode amplitude (rotating 2/1)", ['nssampn1l'], [MachineD3D])
 
-tmamp2 = Signal("Tearing Mode amplitude (rotating 3/2)", ['/nssampn2l'], [MachineD3D])
+tmamp2 = Signal("Tearing Mode amplitude (rotating 3/2)", ['nssampn2l'], [MachineD3D])
 
-tmfreq1 = Signal("Tearing Mode frequency (rotating 2/1)", ['/nssfrqn1l'], [MachineD3D])
+tmfreq1 = Signal("Tearing Mode frequency (rotating 2/1)", ['nssfrqn1l'], [MachineD3D])
 
-tmfreq2 = Signal("Tearing Mode frequency (rotating 3/2)", ['/nssfrqn2l'], [MachineD3D])
+tmfreq2 = Signal("Tearing Mode frequency (rotating 3/2)", ['nssfrqn2l'], [MachineD3D])
 
-ipdirect = Signal("plasma current direction", ["/iptdirect"], [MachineD3D])
+ipdirect = Signal("plasma current direction", ["iptdirect"], [MachineD3D])
 
-ipdirectt = Signal("plasma current direction tol", ["/iptdirect"], [MachineD3D], data_avail_tolerances=[0.029])
+ipdirectt = Signal("plasma current direction tol", ["/ptdirect"], [MachineD3D], data_avail_tolerances=[0.029])
 
 # for downloading, modify this to preprocess shots with only a subset of
 # signals. This may produce more shots
@@ -502,7 +502,7 @@ signal_group_real_time_0D={
     # 'rho_profile_spatial':rho_profile_spatial, 'etemp':etemp,
 }
 
-all_signals = {
+signal_group_all = {
     'q95': q95, 'li': li, 'ip': ip, 'betan': betan, 'energy': energy, 'lm': lm,
     'dens': dens, 'pradcore': pradcore,
     'pradedge': pradedge, 'pradtot': pradtot, 'pin': pin,
@@ -634,63 +634,43 @@ signal_group_thomson = {
 
 
 
-signal_group_restricted = signal_group
+signal_group_restricted = signal_group_all
 
 fully_defined_signals = {
-    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
-        sig.is_defined_on_machines(all_machines))
-}
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (all([m in sig.machines for m in all_machines]))}
 
 fully_defined_signals_0D = {
-    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
-        sig.is_defined_on_machines(all_machines) and sig.num_channels == 1)
-}
+    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (all([m in sig.machines for m in all_machines]))}
+
 fully_defined_signals_1D = {
     sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
-        sig.is_defined_on_machines(all_machines) and sig.num_channels > 1)
-}
-d3d_signals = {
-    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
-        sig.is_defined_on_machine(MachineD3D))
-}
-d3d_signals_n1rms = {
-    sig_name: sig for (sig_name, sig) in signal_group_n1rms.items() if (
-        sig.is_defined_on_machine(MachineD3D))
-}
-d3d_signals_fs07 = {
-    sig_name: sig for (sig_name, sig) in signal_group_fs07.items() if (
-        sig.is_defined_on_machine(MachineD3D))
-}
-d3d_signals_ped = {
-    sig_name: sig for (sig_name, sig) in signal_group_ped.items() if (
-        sig.is_defined_on_machine(MachineD3D))
-}
-d3d_signals_ped_spec = {
-    sig_name: sig for (sig_name, sig) in signal_group_ped_spec.items() if (
-        sig.is_defined_on_machine(MachineD3D))
-}
-d3d_signals_gar18 = {
-    sig_name: sig for (sig_name, sig) in signal_group_gar18.items() if (
-        sig.is_defined_on_machine(MachineD3D))
-}
-d3d_signals_0D = {
-    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
-        (sig.is_defined_on_machine(MachineD3D) and sig.num_channels == 1))
-}
-d3d_signals_1D = {
-    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
-        (sig.is_defined_on_machine(MachineD3D) and sig.num_channels > 1))
-}
+        all([m in sig.machines for m in all_machines]) and sig.num_channels > 1)}
 
-jet_signals = {
-    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
-        sig.is_defined_on_machine(MachineJET))
-}
-jet_signals_0D = {
-    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
-        (sig.is_defined_on_machine(MachineJET) and sig.num_channels == 1))
-}
-jet_signals_1D = {
-    sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (
-        (sig.is_defined_on_machine(MachineJET) and sig.num_channels > 1))
-}
+# All D3D signals
+d3d_signals = {sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (MachineD3D in sig.machines)}
+
+d3d_signals_n1rms = {sig_name: sig for (sig_name, sig) in signal_group_n1rms.items() if (MachineD3D in sig.machines)}
+
+# All Signals with fs07
+d3d_signals_fs07 = {sig_name: sig for (sig_name, sig) in signal_group_fs07.items() if (MachineD3D in sig.machines)}
+
+d3d_signals_ped = {sig_name: sig for (sig_name, sig) in signal_group_ped.items() if (MachineD3D in sig.machines)}
+
+d3d_signals_ped_spec = {sig_name: sig for (sig_name, sig) in signal_group_ped_spec.items() if (MachineD3D in sig.machines)}
+
+d3d_signals_gar18 = {sig_name: sig for (sig_name, sig) in signal_group_gar18.items() if (MachineD3D in sig.machines)}
+
+# All 1D signals on D3D
+d3d_signals_0D = {sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (MachineD3D in sig.machines and sig.num_channels == 1)}
+# All 2D signals on D3D
+d3d_signals_1D = {sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (MachineD3D in sig.machines and sig.num_channels > 1)}
+
+# All Signals on JET
+jet_signals = {sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (MachineJET in sig.machines)}
+
+# All 0D signals on JET
+jet_signals_0D = {sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (MachineJET in sig.machines and sig.num_channels == 1)}
+# All 1D signals on JET
+jet_signals_1D = {sig_name: sig for (sig_name, sig) in signal_group_restricted.items() if (MachineJET in sig.machines and sig.num_channels > 1)}
+
+# End of file user_signals.py

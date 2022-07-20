@@ -72,10 +72,12 @@ class Machine():
 
 
 class MachineNSTX(Machine):
+    # Name and Server are class attributes
+    name = "NSTX"
+    server = "skylark.pppl.gov:8501::"
     def __init__(self, current_threshold=2e-1):
         super(MachineNSTX, self).__init__(current_threshold)
         self.name = "NSTX"
-        self.server = "skylark.pppl.gov:8501::"
 
 
     def fetch_data(signal_path, shot_num, c):
@@ -101,11 +103,19 @@ class MachineNSTX(Machine):
 
 
 class MachineJET(Machine):
-    """JET Machine."""
+    name = "jet"
+    server = "mdsplus.jet.efda.org"
+
+    """JET Machine.
+
+    Attributes:
+        name (str): "JET"
+        server (str): "mdsplus.jet.efda.org"
+
+    """
     def __init__(self, current_threshold=1e5):
         super(MachineJET, self).__init__(current_threshold)
-        self.name = "JET"
-        self.server = "mdsplus.jet.efda.org"
+
 
     def fetch_data(self, signal_path, shot_num, c):
         """Fetch JET data 
@@ -136,11 +146,12 @@ class MachineJET(Machine):
 
 
 class MachineD3D(Machine):
+    # Attributes are static
+    name = "d3d"
+    server = "atlas.gat.com"
     """D3D Machine."""
     def __init__(self, current_threshold=2e-1):
         super(MachineD3D, self).__init__(current_threshold)
-        self.name = "D3D"
-        self.server = "atlas.gat.com"
 
     def fetch_data(MachineD3D, signal_path, shot_num, c):
         """Fetch D3D data 

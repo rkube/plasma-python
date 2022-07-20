@@ -170,6 +170,28 @@ class Preprocessor(object):
         raise DepreciationWarning("replace get_individual_channel_dirs() is conf['paths'][signal_dirs']")
         #return self.conf['paths']['signals_dirs']
 
+    def clean_shot_lists(self):
+        shot_list_dir = self.conf['paths']['shot_list_dir']
+        paths = [os.path.join(shot_list_dir, f) for f in
+                listdir(shot_list_dir) if
+                os.path.isfile(os.path.join(shot_list_dir, f))]
+        for path in paths:
+            self.clean_shot_list(path)
+
+    def clean_shot_list(self, path):
+        data = np.loadtxt(path)
+        # ending_idx = path.rfind('.')
+        new_path = append_to_filename(path, '_clear')
+        if len(np.shape(data)) < 2:
+            # nondisruptive
+            nd_times = -1.0*np.ones_like(data)
+            data_two_column = np.vstack((data, nd_times)).transpose()
+            np.savetxt(new_path, data_two_column, fmt='%d %f')
+            print('created new file: {}'.format(new_path))
+            print('deleting old file: {}'.format(path))
+            os.remove(path)
+
+
     def get_shot_list_path(self):
         raise DepreciationWarning("replace get_shot_list_path() is conf['paths']['saved_shotlist_path']")
         #return self.conf['paths']['saved_shotlist_path']
@@ -196,141 +218,139 @@ class Preprocessor(object):
                  shot_list_test=shot_list_test)
 
 
-    def apply_bleed_in(conf, shot_list_train, shot_list_validate, shot_list_test):
-        np.random.seed(2)
-        num = conf['data']['bleed_in']
-        # new_shots = []
-        if num > 0:
-            shot_list_bleed = ShotList()
-            print('applying bleed in with {} disruptive shots\n'.format(num))
-            # num_total = len(shot_list_test)
-            num_d = shot_list_test.num_disruptive()
-            # num_nd = num_total - num_d
-            assert num_d >= num, (
-                "Not enough disruptive shots {} to cover bleed in {}".format(
-                    num_d, num))
-            num_sampled_d = 0
-            num_sampled_nd = 0
-            while num_sampled_d < num:
-                s = shot_list_test.sample_shot()
-                shot_list_bleed.append(s)
-                if conf['data']['bleed_in_remove_from_test']:
-                    shot_list_test.remove(s)
-                if s.is_disruptive:
-                    num_sampled_d += 1
-                else:
-                    num_sampled_nd += 1
-            print("Sampled {} shots, {} disruptive, {} nondisruptive".format(
-                num_sampled_nd+num_sampled_d, num_sampled_d, num_sampled_nd))
-            print("Before adding: training shots: {} validation shots: {}".format(
-                len(shot_list_train), len(shot_list_validate)))
-            assert(num_sampled_d == num)
-            # add bleed-in shots to training and validation set repeatedly
-            if conf['data']['bleed_in_equalize_sets']:
-                print("Applying equalized bleed in")
-                for shot_list_curr in [shot_list_train, shot_list_validate]:
-                    for i in range(len(shot_list_curr)):
-                        s = shot_list_bleed.sample_shot()
-                        shot_list_curr.append(s)
-            elif conf['data']['bleed_in_repeat_fac'] > 1:
-                repeat_fac = conf['data']['bleed_in_repeat_fac']
-                print("Applying bleed in with repeat factor {}".format(repeat_fac))
-                num_to_sample = int(round(repeat_fac*len(shot_list_bleed)))
-                for i in range(num_to_sample):
+def apply_bleed_in(conf, shot_list_train, shot_list_validate, shot_list_test):
+    np.random.seed(2)
+    num = conf['data']['bleed_in']
+    # new_shots = []
+    if num > 0:
+        shot_list_bleed = ShotList()
+        logging.info(f"applying bleed in with {num} disruptive shots")
+        # num_total = len(shot_list_test)
+        num_d = shot_list_test.num_disruptive()
+        # num_nd = num_total - num_d
+        assert num_d >= num, ("Not enough disruptive shots {num_d} to cover bleed in {num}")
+        num_sampled_d = 0
+        num_sampled_nd = 0
+        while num_sampled_d < num:
+            s = shot_list_test.sample_shot()
+            shot_list_bleed.append(s)
+            if conf['data']['bleed_in_remove_from_test']:
+                shot_list_test.remove(s)
+            if s.is_disruptive:
+                num_sampled_d += 1
+            else:
+                num_sampled_nd += 1
+        print("Sampled {} shots, {} disruptive, {} nondisruptive".format(
+            num_sampled_nd+num_sampled_d, num_sampled_d, num_sampled_nd))
+        print("Before adding: training shots: {} validation shots: {}".format(
+            len(shot_list_train), len(shot_list_validate)))
+        assert(num_sampled_d == num)
+        # add bleed-in shots to training and validation set repeatedly
+        if conf['data']['bleed_in_equalize_sets']:
+            print("Applying equalized bleed in")
+            for shot_list_curr in [shot_list_train, shot_list_validate]:
+                for i in range(len(shot_list_curr)):
                     s = shot_list_bleed.sample_shot()
-                    shot_list_train.append(s)
-                    shot_list_validate.append(s)
-            else:  # add each shot only once
-                print("Applying bleed in without repetition")
-                for s in shot_list_bleed:
-                    shot_list_train.append(s)
-                    shot_list_validate.append(s)
-            print("After adding: training shots: {} validation shots: {}".format(
-                len(shot_list_train), len(shot_list_validate)))
-            print("Added bleed in shots to training and validation sets")
-        # if num_d > 0:
-        #     for i in range(num):
-        #         s = shot_list_test.sample_single_class(True)
-        #         shot_list_train.append(s)
-        #         shot_list_validate.append(s)
-        #         if conf['data']['bleed_in_remove_from_test']:
-        #             shot_list_test.remove(s)
-        # else:
-        #     print('No disruptive shots in test set, omitting bleed in')
-        # if num_nd > 0:
-        #     for i in range(num):
-        #         s = shot_list_test.sample_single_class(False)
-        #         shot_list_train.append(s)
-        #         shot_list_validate.append(s)
-        #         if conf['data']['bleed_in_remove_from_test']:
-        #             shot_list_test.remove(s)
-        # else:
-        #     print('No nondisruptive shots in test set, omitting bleed in')
-        return shot_list_train, shot_list_validate, shot_list_test
+                    shot_list_curr.append(s)
+        elif conf['data']['bleed_in_repeat_fac'] > 1:
+            repeat_fac = conf['data']['bleed_in_repeat_fac']
+            print("Applying bleed in with repeat factor {}".format(repeat_fac))
+            num_to_sample = int(round(repeat_fac*len(shot_list_bleed)))
+            for i in range(num_to_sample):
+                s = shot_list_bleed.sample_shot()
+                shot_list_train.append(s)
+                shot_list_validate.append(s)
+        else:  # add each shot only once
+            print("Applying bleed in without repetition")
+            for s in shot_list_bleed:
+                shot_list_train.append(s)
+                shot_list_validate.append(s)
+        print("After adding: training shots: {} validation shots: {}".format(
+            len(shot_list_train), len(shot_list_validate)))
+        print("Added bleed in shots to training and validation sets")
+    # if num_d > 0:
+    #     for i in range(num):
+    #         s = shot_list_test.sample_single_class(True)
+    #         shot_list_train.append(s)
+    #         shot_list_validate.append(s)
+    #         if conf['data']['bleed_in_remove_from_test']:
+    #             shot_list_test.remove(s)
+    # else:
+    #     print('No disruptive shots in test set, omitting bleed in')
+    # if num_nd > 0:
+    #     for i in range(num):
+    #         s = shot_list_test.sample_single_class(False)
+    #         shot_list_train.append(s)
+    #         shot_list_validate.append(s)
+    #         if conf['data']['bleed_in_remove_from_test']:
+    #             shot_list_test.remove(s)
+    # else:
+    #     print('No nondisruptive shots in test set, omitting bleed in')
+    return shot_list_train, shot_list_validate, shot_list_test
 
 
-    def guarantee_preprocessed(conf, verbose=False):
-        pp = Preprocessor(conf)
+def guarantee_preprocessed(conf, verbose=False):
+    pp = Preprocessor(conf)
 
-        # TODO: replace function with definitino here
-        #def all_are_preprocessed(self):
-        #    return os.path.isfile(self.get_shot_list_path())
-        if isfile(conf['paths']['saved_shotlist_path']):
-            logging.info(f"{self.get_shot_list_path()} exists. Skipping preprocessing")
-            shot_list_train, shot_list_validate, shot_list_test = pp.load_shotlists()
-        else:
-            logging.info("Formatting shots....")
-            # Make sure the shot lists are properly formatted
-            pp.format_shot_lists()
-            # Preprocess all available shots
-            logging.info("Preprocessing from files...")
-            shot_list = pp.preprocess_from_files(conf["paths"]["shot_files_all"], conf["data"]["use_shots"])
-            shot_list.sort()
-            shot_list_train, shot_list_test = shot_list.split_train_test(conf)
-            # num_shots = len(shot_list_train) + len(shot_list_test)
-            validation_frac = conf['training']['validation_frac']
-            if validation_frac <= 0.05:
-                if verbose:
-                    g.print_unique('Setting validation to a minimum of 0.05')
-                validation_frac = 0.05
-            shot_list_train, shot_list_validate = shot_list_train.split_direct(
-                1.0-validation_frac, do_shuffle=True)
-            pp.save_shotlists(shot_list_train, shot_list_validate, shot_list_test)
+    # TODO: replace function with definitino here
+    #def all_are_preprocessed(self):
+    #    return os.path.isfile(self.get_shot_list_path())
+    if isfile(conf['paths']['saved_shotlist_path']):
+        logging.info(f"{self.get_shot_list_path()} exists. Skipping preprocessing")
+        shot_list_train, shot_list_validate, shot_list_test = pp.load_shotlists()
+    else:
+        logging.info("Formatting shots....")
+        # Make sure the shot lists are properly formatted
+        pp.format_shot_lists()
+        # Preprocess all available shots
+        logging.info("Preprocessing from files...")
+        shot_list = pp.preprocess_from_files(conf["paths"]["shot_files_all"], conf["data"]["use_shots"])
+        shot_list.sort()
+        shot_list_train, shot_list_test = shot_list.split_train_test(conf)
+        # num_shots = len(shot_list_train) + len(shot_list_test)
+        validation_frac = conf['training']['validation_frac']
+        if validation_frac <= 0.05:
+            if verbose:
+                g.print_unique('Setting validation to a minimum of 0.05')
+            validation_frac = 0.05
+        shot_list_train, shot_list_validate = shot_list_train.split_direct(
+            1.0-validation_frac, do_shuffle=True)
+        pp.save_shotlists(shot_list_train, shot_list_validate, shot_list_test)
 
-        shot_list_train, shot_list_validate, shot_list_test = apply_bleed_in(
-            conf, shot_list_train, shot_list_validate, shot_list_test)
+    shot_list_train, shot_list_validate, shot_list_test = apply_bleed_in(
+        conf, shot_list_train, shot_list_validate, shot_list_test)
 
-        logging.debug(f"Validate {len(shot_list_train)} shots - {shot_list_train.num_disruptive()} disruptive")
-        logging.debug(f"Validate {len(shot_list_validate)} shots - {shot_list_validate.num_disruptive()} disruptive")
-        logging.debug(f"Validate {len(shot_list_testing)} shots - {shot_list_testing.num_disruptive()} disruptive")
+    logging.debug(f"Validate {len(shot_list_train)} shots - {shot_list_train.num_disruptive()} disruptive")
+    logging.debug(f"Validate {len(shot_list_validate)} shots - {shot_list_validate.num_disruptive()} disruptive")
+    logging.debug(f"Validate {len(shot_list_testing)} shots - {shot_list_testing.num_disruptive()} disruptive")
 
-        #    g.print_unique("...printing test shot list:")
-        #    for s in shot_list_test:
-        #       g.print_unique(str(s.number))
+    #    g.print_unique("...printing test shot list:")
+    #    for s in shot_list_test:
+    #       g.print_unique(str(s.number))
 
-        select_shot =True
-        ss = list(range(153760,153768))+list(range(170865,170897))+list(range(174819,174853))+[166671]
-        if select_shot:
-        for s in shot_list_train:
-                if s.number in ss:
-                print('Found in train',s.number)
-                shot_list_train.remove(s)
-                shot_list_test.append(s)
-        for s in shot_list_validate:
-                if s.number in ss:
-                print('Found in validate',s.number)
-                shot_list_validate.remove(s)
-                shot_list_test.append(s)
-        for s in shot_list_test:
-                if s.number in ss:
-                print('Found in test',s.number)
-        if verbose:
-            g.print_unique('validate: {} shots, {} disruptive'.format(
-                len(shot_list_validate), shot_list_validate.num_disruptive()))
-            g.print_unique('training: {} shots, {} disruptive'.format(
-                len(shot_list_train), shot_list_train.num_disruptive()))
-            g.print_unique('testing: {} shots, {} disruptive'.format(
-                len(shot_list_test), shot_list_test.num_disruptive()))
-            g.print_unique("...done")
+    select_shot =True
+    ss = list(range(153760,153768))+list(range(170865,170897))+list(range(174819,174853))+[166671]
+    if select_shot:
+    for s in shot_list_train:
+            if s.number in ss:
+            print('Found in train',s.number)
+            shot_list_train.remove(s)
+            shot_list_test.append(s)
+    for s in shot_list_validate:
+            if s.number in ss:
+            print('Found in validate',s.number)
+            shot_list_validate.remove(s)
+            shot_list_test.append(s)
+    for s in shot_list_test:
+            if s.number in ss:
+            print('Found in test',s.number)
+    if verbose:
+        g.print_unique('validate: {} shots, {} disruptive'.format(
+            len(shot_list_validate), shot_list_validate.num_disruptive()))
+        g.print_unique('training: {} shots, {} disruptive'.format(
+            len(shot_list_train), shot_list_train.num_disruptive()))
+        g.print_unique('testing: {} shots, {} disruptive'.format(
+            len(shot_list_test), shot_list_test.num_disruptive()))
+        g.print_unique("...done")
 
-        return shot_list_train, shot_list_validate, shot_list_test
+    return shot_list_train, shot_list_validate, shot_list_test

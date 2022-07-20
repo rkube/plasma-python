@@ -16,7 +16,7 @@ import logging
 
 from plasma.primitives.machine import Machine, MachineD3D, MachineJET, MachineNSTX
 
-from plasma.utils.processing import train_test_split, cut_and_resample_signal
+from plasma.utils.processing import train_test_split, cut_and_resample_signal, get_individual_shot_file
 from plasma.utils.downloading import makedirs_process_safe
 from plasma.utils.find_elms import *
 from plasma.utils.find_rational import *
@@ -309,16 +309,18 @@ class Shot(object):
                  ttd=None, valid=None, is_disruptive=None, t_disrupt=None):
         """Initializes a shot object.
 
-        Shot objects contain following attributes:
+        Arguments
+            number (int)
+                unique identifier of a shot
+            t_disrupt (float)
+                disruption time in milliseconds (second column in the shotlist input file)
+            ttd (ndarray, float)
+                time profile of the shot converted to time-to-disruption values
+            valid (bool)
+                Indicates whether plasma property (specifically, current) reaches a certain value during the shot
+            is_disruptive (bool)
+                Indicates whether a shot is disruptive
 
-         - number.........: integer, unique identifier of a shot
-         - t_disrupt......: double, disruption time in milliseconds (second column in
-                            the shotlist input file)
-         - ttd............: Numpy array of doubles, time profile of the shot converted to
-                             time-to-disruption values
-         - valid..........: boolean flag indicating whether plasma property
-                            (specifically, current) reaches a certain value during the shot
-         - is_disruptive..: boolean flag indicating whether a shot is disruptive
         """
         self.number = number               # Shot identifier
         self.machine = machine             # machine on which the shot is defined
@@ -363,7 +365,7 @@ class Shot(object):
         """String representation of the shot"""
         string = f"number: {self.number}\n"
         string += "machine: {self.machine}\n"
-        string += "signals: {self.signal}\n"
+        string += "signals: {self.signals}\n"
         string += "signals_dict: {signals_dict}\n"
         string += "ttd: {self.ttd}\n"
         string += "valid: {self.valid}\n"
@@ -722,6 +724,3 @@ class Shot(object):
         return t >= 0
 
 # it used to be in utilities, but can't import globals in multiprocessing
-
-def get_individual_shot_file(prepath, shot_num, ext='.txt'):
-    return prepath + str(shot_num) + ext

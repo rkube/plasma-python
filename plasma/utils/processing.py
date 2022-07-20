@@ -12,6 +12,8 @@ from __future__ import print_function
 import itertools
 
 import numpy as np
+
+from os.path import join
 # from scipy.interpolate import UnivariateSpline
 
 # interpolate in a way that doesn't use future information.
@@ -58,8 +60,8 @@ def cut_and_resample_signal(t, sig, tmin, tmax, dt, precision_str):
     return resample_signal(t, sig, tmin, tmax, dt, precision_str)
 
 
-def get_individual_shot_file(prepath, shot_num, ext='.txt'):
-    return prepath + str(shot_num) + ext
+def get_individual_shot_file(prepath, shot_num, ext='txt'):
+    return join(prepath, f"{shot_num}.{ext}")
 
 
 def append_to_filename(path, to_append):

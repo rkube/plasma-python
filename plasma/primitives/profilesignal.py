@@ -28,23 +28,22 @@ class ProfileSignal(Signal):
         self.num_channels = num_channels
 
     def load_data(self, prepath, shot, dtype='float32'):
-       """Loads data from txt file and peforms data wrangling into a profile.
+        """Loads data from txt file and peforms data wrangling into a profile.
 
         Args:
-          prepath:
-          shot:
-          dtype:
+            prepath:
+            shot:
+            dtype:
 
         Returns:
-          t: ndarray(float) Signal time base
-          sig_inter: Interpolated signal 
+            t: ndarray(float) Signal time base
+            sig_inter: Interpolated signal
 
         Raises
-          SignalCorruptedError: When the interval where the current threshold is satisfied is too short.
-                                When the time interval is too short
-                                If the dynamic range of the signal is too low
-                                If the timebase or the signal contains NaNs
-        
+            SignalCorruptedError: When the interval where the current threshold is satisfied is too short.
+                                  When the time interval is too short
+                                  If the dynamic range of the signal is too low
+                                  If the timebase or the signal contains NaNs
         
         """
         data = self._load_data_from_txt_safe(prepath, shot)

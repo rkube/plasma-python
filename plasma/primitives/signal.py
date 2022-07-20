@@ -117,7 +117,7 @@ class Signal():
             dtype:
 
         Returns:
-            data: ndarray(float) Signal data
+            data: ndarray(float) Signal datasignal
 
         Raises
             NotDownloadedError when the signal was not downloaded.
@@ -128,12 +128,16 @@ class Signal():
         manipulation for tasks downstream.
 
         """
-        # Build the path
-        file_path = self.get_file_path(prepath, shot.machine, shot.number)
+        # Constructs the filename for a signal. Format:
+        # prepath/machine.name/signal.dirname/shot_number
+        file_path = get_individual_shot_file(join(prepath, shot.machine.name, self.get_path(shot.machine)), shot.number)
+
+
+        #file_path = self.get_file_path(prepath, shot.machine, shot.number)
         # Make sure the file exists and has non-zero size so that we can raise
         # more specific error messages.
         if not isfile(file_path):
-            raise NotDownloadedError(f"Signal {self.description} , shot {shot.number} was never downloaded")
+            raise NotDownloadedError(f"Signal {self.description}, shot {shot.number} was never downloaded: {file_path} does not exist")
 
         if getsize(file_path) == 0:
             raise SignalCorruptedError(f"Signal {self.description}, shot {shot.number} was downloaded incorrectly (empty file). Removing.")
@@ -148,10 +152,10 @@ class Signal():
     def load_data(self, prepath, shot, dtype='float32'):
         """Loads data from txt file and peforms data wrangling.
 
-        Args:
-          prepath:
-          shot:
-          dtype:
+        Args
+          prepath (str): Base path for loading
+          shot (:obj:`plasma.primitives.shots.Shot`): Shot
+          dtype (str, optional): Data type to be used as floats.
 
         Returns:
           data: ndarray(float) Signal data 
@@ -244,9 +248,11 @@ class Signal():
         raise DeprecationWarning("Use Signal.fetch_data!")
 
     def is_defined_on_machine(self, machine):
+        raise DeprecationWarning("Use function body directly")
         return machine in self.machines
 
     def is_defined_on_machines(self, machines):
+        raise DeprecationWarning("Use function body directly!")
         return all([m in self.machines for m in machines])
 
     def get_path(self, machine):
