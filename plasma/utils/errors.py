@@ -10,8 +10,13 @@ class SignalCorruptedError(Exception):
     pass
 
 class SignalNotFoundError(Exception):
-    """Raised when a signal wasn't found"""
+    """Raised when a signal wasn't found."""
 
+class DataFormatError(Exception):
+    """Raised when data format is not as expected."""
 
+class BadShotException(Exception):
+    """Raised when a bad shot is processed."""
+    pass
 
 # end of file errors.py

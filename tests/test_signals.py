@@ -9,8 +9,7 @@ class TestSignals(unittest.TestCase):
     """Test routines for machines."""
     def test_signal_fs07(self):
         """Test whether we can instantiate signals"""
-        fs07 = Signal("filterscope fs07", ['/fs07'], [MachineD3D])
-        print(dir(fs07))
+        fs07 = Signal("filterscope fs07", [fs07'], [MachineD3D])
 
 
 if __name__ == "__main__":

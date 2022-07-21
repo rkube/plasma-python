@@ -1,13 +1,29 @@
 # -*- coding: utf-8 -*-
 
 import re
+from os.path import join
 from plasma.primitives.signal import Signal
+from plasma.utils.processing import get_individual_shot_file
+from plasma.utils.errors import DataFormatError
 
 class ChannelSignal(Signal):
     """A signal best represented by a number of channels."""
     def __init__(self, description, paths, machines, tex_label=None,
                  causal_shifts=None, data_avail_tolerances=None,
                  is_strictly_positive=False, mapping_paths=None):
+        """Initializes the ChannelSignal
+
+        Args:
+            description (string) :
+            paths (list[string]) :
+            machines (list :obj:`plasma.primitives.machine.Machine) :
+            tex_label (str) :
+            causal_shifts :
+            data_avail_tolerances :
+            is_strictly_positive :
+            mapping_paths :
+
+        """
         super(ChannelSignal, self).__init__(
             description, paths, machines, tex_label, causal_shifts,
             is_ip=False, data_avail_tolerances=data_avail_tolerances,
@@ -18,6 +34,7 @@ class ChannelSignal(Signal):
         self.paths = new_paths
 
     def get_channel_nums(self, paths):
+        """A mystery function."""
         regex = re.compile(r'channel\d+')
         regex_int = re.compile(r'\d+')
         nums = []
@@ -33,6 +50,7 @@ class ChannelSignal(Signal):
             else:
                 nums.append(int(regex_int.findall(res[0])[0]))
                 new_paths.append("/".join(elements[:-1]))
+
         return nums, new_paths
 
     def get_channel_num(self, machine):
@@ -40,26 +58,33 @@ class ChannelSignal(Signal):
         return self.channel_nums[idx]
 
     def fetch_data(self, machine, shot_num, c):
-        time, data, mapping, success = self.fetch_data_basic(
-            machine, shot_num, c)
+        """Fetches signal data.
+
+            Args:
+                machine (:obj:`plasma.primitives.machine.Machine`)
+                shot_num (int) :
+                c (???) :
+
+            Returns
+                Nothing
+
+            Raises:
+                DataFormatError : When the loaded data array has less than 2 dimensions.
+
+        """
+        time, data, mapping = self.fetch_data_basic(machine, shot_num, c)
+        if np.ndim(data) != 2:
+            raise DataFormatError(f"Channel Signal {self} expected 2D array for shot {self.shotnumber}")
+
         mapping = None  # we are not interested in the whole profile
         channel_num = self.get_channel_num(machine)
-        if channel_num is not None and success:
-            if np.ndim(data) != 2:
-                print("Channel Signal {} expected 2D array for shot {}".format(
-                    self, self.shot_number))
-                success = False
-            else:
-                data = data[channel_num, :]  # extract channel of interest
-        return time, data, mapping, success
+        data = data[channel_num, :]  # extract channel of interest
+
+        return time, data, mapping
 
     def get_file_path(self, prepath, machine, shot_number):
         dirname = self.get_path(machine)
-        num = self.get_channel_num(machine)
-        if num is not None:
-            dirname += "/channel{}".format(num)
-        return get_individual_shot_file(prepath + '/' + machine.name + '/'
-                                        + dirname + '/', shot_number)
+        dirname = join(dirname, f"channel{self.get_channel_num(machine)}")
+        return get_individual_shot_file(join(prepath, machine.name, dirname), shot_number)
 
-
-
+# end of file channelsignal.py

@@ -240,7 +240,7 @@ class MeanVarNormalizer(Normalizer):
     def extract_stats(self, shot):
         stats = Stats()
         if shot.valid:
-            list_of_signals = shot.get_individual_signal_arrays()
+            list_of_signals = [shot.signals_dict[sig] for sig in shot.signals]
             num_signals = len(list_of_signals)
             stats.means = np.reshape(np.array([np.mean(sig) for
                                                sig in list_of_signals]),

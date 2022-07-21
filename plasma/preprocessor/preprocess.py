@@ -292,7 +292,7 @@ def apply_bleed_in(conf, shot_list_train, shot_list_validate, shot_list_test):
 def guarantee_preprocessed(conf, verbose=False):
     pp = Preprocessor(conf)
 
-    # TODO: replace function with definitino here
+    # TODO: replace function with definition here
     #def all_are_preprocessed(self):
     #    return os.path.isfile(self.get_shot_list_path())
     if isfile(conf['paths']['saved_shotlist_path']):
@@ -310,12 +310,12 @@ def guarantee_preprocessed(conf, verbose=False):
         # num_shots = len(shot_list_train) + len(shot_list_test)
         validation_frac = conf['training']['validation_frac']
         if validation_frac <= 0.05:
-            if verbose:
-                g.print_unique('Setting validation to a minimum of 0.05')
+            logging.info('Setting validation to a minimum of 0.05')
             validation_frac = 0.05
         shot_list_train, shot_list_validate = shot_list_train.split_direct(
             1.0-validation_frac, do_shuffle=True)
         pp.save_shotlists(shot_list_train, shot_list_validate, shot_list_test)
+    2+3
 
     shot_list_train, shot_list_validate, shot_list_test = apply_bleed_in(
         conf, shot_list_train, shot_list_validate, shot_list_test)

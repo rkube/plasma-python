@@ -27,13 +27,13 @@ def time_sensitive_interp(x, t, t_new):
     return x[indices]
 
 
-def resample_signal(t, sig, tmin, tmax, dt, precision_str='float32'):
+def resample_signal(t, sig, tmin, tmax, dt, dtype='float32'):
     order = np.argsort(t)
     t = t[order]
     sig = sig[order, :]
     sig_width = sig.shape[1]
-    tt = np.arange(tmin, tmax, dt, dtype=precision_str)
-    sig_interp = np.zeros((len(tt), sig_width), dtype=precision_str)
+    tt = np.arange(tmin, tmax, dt, dtype=dtype)
+    sig_interp = np.zeros((len(tt), sig_width), dtype=dtype)
     for i in range(sig_width):
         # make sure to not use future information
         sig_interp[:, i] = time_sensitive_interp(sig[:, i], t, tt)
@@ -50,13 +50,24 @@ def resample_signal(t, sig, tmin, tmax, dt, precision_str='float32'):
 
 
 def cut_signal(t, sig, tmin, tmax):
-    mask = np.logical_and(t >= tmin,  t <= tmax)
+    """Truncate signal to tmin/tmax.
+
+    Args:
+        t (array, float) : time base of a signal
+        sig (array, float) : signal
+        tmin (float): Lower time limit
+        tmax (float): Upper time limit
+
+    Returns:
+        t (array, float) : timebase truncated to [tmin:tmax]
+        sig (array, float) : signal truncated to [tmin, tmax]
+    """
+    mask = np.logical_and(t >= tmin, t <= tmax)
     return t[mask], sig[mask, :]
 
 
 def cut_and_resample_signal(t, sig, tmin, tmax, dt, precision_str):
     t, sig = cut_signal(t, sig, tmin, tmax)
-    print(tmin,tmax)
     return resample_signal(t, sig, tmin, tmax, dt, precision_str)
 
 

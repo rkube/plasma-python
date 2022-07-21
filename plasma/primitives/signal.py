@@ -149,7 +149,7 @@ class Signal():
 
         return data
 
-    def load_data(self, prepath, shot, dtype='float32'):
+    def load_data(self, prepath, shot, dtype=np.float32):
         """Loads data from txt file and peforms data wrangling.
 
         Args
@@ -158,7 +158,8 @@ class Signal():
           dtype (str, optional): Data type to be used as floats.
 
         Returns:
-          data: ndarray(float) Signal data 
+            tb (ndarray) : Signal timebase
+            data: ndarray(float) Signal data
 
         Raises
           SignalCorruptedError: When the interval where the current threshold is satisfied is too short.
@@ -173,7 +174,7 @@ class Signal():
         if np.ndim(data) == 1:
             data = np.expand_dims(data, axis=0)
 
-        t = data[:, 0]
+        tb = data[:, 0]
         sig = data[:, 1:]
 
         # If desired, restrict the signal to the interval where the current threshold is satisfied.
@@ -188,30 +189,37 @@ class Signal():
             first_idx, last_idx = region[0], region[-1]
             
             # add 50 ms to cover possible disruption event
-            last_time = t[last_idx] + 5e-2
+            last_time = tb[last_idx] + 5e-2
             last_indices = np.where(t > last_time)[0]
             if len(last_indices) == 0:
                 last_idx = -1
             else:
                 last_idx = last_indices[0]
-            t = t[first_idx:last_idx]
+            tb = tb[first_idx:last_idx]
             sig = sig[first_idx:last_idx, :]
 
         # make sure shot is not garbage data
         # The length should be larger than one
         # If the dynamic range of the signal is too low we assuem it is garbage data
-        if len(t) <= 1:
-            raise SignalCorruptedError(f"Signal {self.description}, shot {shot.number} is contains no data.")
+        if tb.size <= 1:
+            raise SignalCorruptedError(f"Signal {self.description}, shot {shot.number}: Timebase size is {tb.size}.")
+
+        if tb.ndim != 1:
+            raise SignalCorruptedError(f"Signal {self.description}: Timebase dimension is {tb.ndim}, but expected ndim=1.")
+
+        # Assert that the data looks reasonable. If this is the case continue working with it
+        if sig.ndim != 2:
+            raise SignalCorruptedError(f"Signal {self.description}: Expected to have 2 dimensions but found {sig.ndim}. ??? Not sure if this has to be the case...")
 
         if (np.max(sig) - np.min(sig) < 1e-8):
             raise SignalCorruptedError(f"Dynamic range of signal {self.description}, shot {shot.number}, is smaller than 1e-8")
 
         # make sure data doesn't contain nan
-        if np.any(np.isnan(t)) or np.any(np.isnan(sig)):
+        if np.any(np.isnan(tb)) or np.any(np.isnan(sig)):
             raise SignalCorruptedError(f"Signal {self.description}, shot {shot.number} contains NaNs")
 
         # Finall,y return time base and the signal
-        return t, sig
+        return tb, sig
 
 
     def _fetch_data_basic(self, machine, shot_num, c, path=None):
