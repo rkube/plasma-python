@@ -22,31 +22,78 @@ from os.path import join
 # and interpolates to there.
 
 
+
+class tb_resampler():
+    """Resamples a signal on a time-base"""
+
+    def __init__(self, t_min, t_max, dt):
+        """Initializes signal resampler
+
+        Paramters:
+            t_min (float): Start time of resampled signal
+            t_max (float): Desired end time of resampled signal
+            dt (float): Sampling time of resampled signal
+        """
+        self.t_min = t_min
+        self.t_max = t_max
+        self.dt = dt
+
+    def resample(self, signal, tb):
+        """Resample signal on new time-base
+
+        Parameters:
+            signal (ndarray) : Signal that we want to resample
+            tb (ndarray) : time-bsae of the passed signal
+        """
+        # Assert that signal and time base have the same number of elements
+        assert(tb.shape[0] == signal.shape[0])
+
+
+
+
 def time_sensitive_interp(x, t, t_new):
-    indices = np.maximum(0, np.searchsorted(t, t_new, side='right')-1)
+    indices = np.maximum(0, np.searchsorted(t, t_new, side='right') - 1)
     return x[indices]
 
 
-def resample_signal(t, sig, tmin, tmax, dt, dtype='float32'):
-    order = np.argsort(t)
-    t = t[order]
-    sig = sig[order, :]
-    sig_width = sig.shape[1]
+def resample_signal(t, sig, tmin, tmax, dt, dtype=np.float32):
+    """Resample a signal onto a new time-base.
+
+    Parameters:
+        tb (ndarray, float) : Time-base of the input signal
+        sig (ndarray, float) : Input signal
+        tmin (float) : Start time of target time-bsae
+        tmax (float) : End time of target time-base
+        dt (float) : time-step of target time-base
+
+    Returns
+        tt (ndarray, float) : Re-sampled time bsae
+        sig_rs (ndarray, float) : Re-sampled signal
+
+    Raises:
+        ValueError : When the re-sampled signal contains a NaN
+
+
+    """
+    # Find the indices that sort the time bsae
+    sort_idx = np.argsort(t)
+    t = t[sort_idx]
+    sig = sig[sort_idx, :]
+    num_channels = sig.shape[1]
+    # Allocate arrays for new time-base and re-sampled signal
     tt = np.arange(tmin, tmax, dt, dtype=dtype)
-    sig_interp = np.zeros((len(tt), sig_width), dtype=dtype)
-    for i in range(sig_width):
+    sig_rs = np.zeros((len(tt), num_channels), dtype=dtype)
+
+    for i in range(num_channels):
         # make sure to not use future information
-        sig_interp[:, i] = time_sensitive_interp(sig[:, i], t, tt)
+        sig_rs[:, i] = time_sensitive_interp(sig[:, i], t, tt)
         # f = UnivariateSpline(t,sig[:,i],s=0,k=1,ext=0)
         # sig_interp[:,i] = f(tt)
-    if(np.any(np.isnan(sig_interp))):
-        print("signal contains nan")
-    if(np.any(t[1:] - t[:-1] <= 0)):
-        print("non increasing")
-        idx = np.where(t[1:] - t[:-1] <= 0)[0][0]
-        print(t[idx-10:idx+10])
 
-    return tt, sig_interp
+    if(np.any(np.isnan(sig_rs))):
+        raise ValueError("Resampled signal contains NaN")
+
+    return tt, sig_rs
 
 
 def cut_signal(t, sig, tmin, tmax):
@@ -66,9 +113,9 @@ def cut_signal(t, sig, tmin, tmax):
     return t[mask], sig[mask, :]
 
 
-def cut_and_resample_signal(t, sig, tmin, tmax, dt, precision_str):
-    t, sig = cut_signal(t, sig, tmin, tmax)
-    return resample_signal(t, sig, tmin, tmax, dt, precision_str)
+# def cut_and_resample_signal(t, sig, tmin, tmax, dt, dtype=np.float32):
+#     t, sig = cut_signal(t, sig, tmin, tmax)
+#     return resample_signal(t, sig, tmin, tmax, dt, dtype)
 
 
 def get_individual_shot_file(prepath, shot_num, ext='txt'):

@@ -252,7 +252,6 @@ class Signal():
         return time, np.array(data), mapping, success
 
     def fetch_data(self, machine, shot_num, c):
-
         raise DeprecationWarning("Use Signal.fetch_data!")
 
     def is_defined_on_machine(self, machine):

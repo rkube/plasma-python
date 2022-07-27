@@ -16,7 +16,7 @@ import logging
 
 from plasma.primitives.machine import Machine, MachineD3D, MachineJET, MachineNSTX
 
-from plasma.utils.processing import train_test_split, cut_and_resample_signal, get_individual_shot_file
+from plasma.utils.processing import train_test_split, resample_signal, get_individual_shot_file
 from plasma.utils.downloading import makedirs_process_safe
 from plasma.utils.find_elms import *
 from plasma.utils.find_rational import *
@@ -24,6 +24,429 @@ from plasma.utils.find_rational import *
 from plasma.data.user_data import bad_shot_list_d3d
 
 from plasma.utils.errors import BadShotException, SignalCorruptedError
+
+
+
+class Shot(object):
+    """A class representing a shot. 
+
+    A shot collects multiple measurement of plasma properties (current, locked mode
+    amplitude, etc.).
+
+    This class
+    * Contains a dictionary / list of signals within a shot
+    * Exposes data loading functinoality (implemented by calling the signals' getter methods)
+    * Encapsulates pre-processing functionality
+    * Provides a target function
+
+
+    TODO:
+    * When instantiating a shot it usually is empty. Why is there an option to pass signals_dict in the contructor?
+    """
+
+    def __init__(self, number=None, machine=None, signals=None, ttd=None,
+                 is_disruptive=None, t_disrupt=None, dtype=np.float32,
+                 weight=1.0, augmentation_fn=None):
+        """Initializes a shot object.
+
+        Arguments
+            number (int)
+                unique identifier of a shot
+            t_disrupt (float)
+                disruption time in milliseconds (second column in the shotlist input file)
+            ttd (ndarray, float)
+                time profile of the shot converted to time-to-disruption values
+            is_disruptive (bool)
+                Indicates whether a shot is disruptive
+            dtype (np.float32, optional)
+                Numerical type used for floating point numbers
+
+        """
+        self.number = number               # Shot identifier
+        self.machine = machine             # machine on which the shot is defined
+        self.signals = signals             # List of signals available in the shot
+        self.dtype = dtype                 # data type to use
+        self.weight = weight
+        self.augmentation_fn = augmentation_fn
+
+        # Upon instantiation, the following member variables are empty:
+        # Timebase of the shot. Approaches zero for disruption
+        self.ttd = ttd
+        # True if the shot disrupts, false otherwise
+        self.is_disruptive = is_disruptive
+        # Time of the disruption
+        self.t_disrupt = t_disrupt
+        # This is a dictionary with signals as keys and
+        # pre-processed data arrays of the signals as values
+        self.signals_dict = {}
+
+        if t_disrupt is not None:
+            self.is_disruptive = Shot.is_disruptive_given_disruption_time(
+                t_disrupt)
+        else:
+            logging.info('Warning, disruption time (disruptivity) not set! ',
+                  'Either set t_disrupt or is_disruptive')
+
+        # The DIII-D shots below 
+        if machine == MachineD3D and self.number in bad_shot_list_d3d:
+            raise BadShotException(f"Shot.__init__(): Shot {self.number} on D3D is not good.")
+
+
+    def preprocess(self, conf):
+        """Loads all signals and resamples to common time-base.
+
+        This function provides the main interface to make shot data available
+        inside the object.
+        First, each signal defined in the signal is loaded.
+        With all signals at hand, a common time-base can be defined.
+        Then the signals are clipped to this timebase and resampled
+        with the sampling frequency specified in the config object.
+
+        Parameters:
+            conf (dict): global configuration
+
+        Returns:
+            None
+        """
+        logging.info(f"Preprocessing shot {self.number}")
+        # get minmax times
+        time_arrays, signal_arrays, t_min, t_max  = self._load_signal_data(conf)
+
+        # cut and resample
+        logging.info(f"Resampling shot {self.number}",)
+        # resample signals on a common time-base
+        assert((len(signal_arrays) == len(time_arrays) == len(self.signals)) and len(signal_arrays) > 0)
+
+        for (i, signal) in enumerate(self.signals):
+            # Cut the signal to [t_min:t_max]
+            good_idx = (time_arrays[i] >= t_min) & (time_arrays[i] <= t_max)
+            tb = time_arrays[i][good_idx]
+            sig = signal_arrays[i][good_idx]
+            # Interpolate on new time-base
+            tb_rs, sig_rs = resample_signal(tb, sig, t_min, t_max, conf["data"]["dt"], self.dtype)
+            # Populate signals_dict with the re-sampled
+            self.signals_dict[signal] = sig_rs
+
+        # Why to we take only the last time-base and convert to ttd?
+        self.ttd = self.convert_to_ttd(tb_rs, conf)
+
+        return None
+
+
+
+    def get_data_arrays(self, use_signals, cont_signal=None, cont_value=None):
+        """Allocates a numpy array for signals in this shot.
+
+        Allocate a 2d array with dimensions length(time) * sum signal.num_channels.
+
+        If the optional parameter contaminate_signal is equals the description of a 
+        existing signal in self.signals_dict, the values of that signal will be replace with
+        cont_value
+
+        Parameters:
+          use_signals: list(:obj:`plasma.primitives.signals.signal`) List of signals to use for data allocation
+          cont_signal: (string) Description of the signal that will be contaminated
+          cont_value: (float) New value of the contamination signals
+
+
+        Output:
+          t_array: ndarray(float)  Time base array
+          signal_array: ndarray(float)  Array with one signal per column
+        """
+
+        # Pre-allocate numpy array
+        signal_array = np.zeros((len(self.ttd), sum([sig.num_channels for sig in use_signals])), dtype=self.dtype)
+
+        # Deep copy all signal data into the allocated array
+        curr_idx = 0
+        for sig in use_signals:
+            signal_array[:, curr_idx:curr_idx + sig.num_channels] = self.signals_dict[sig]
+            if sig.description == cont_signal:
+              logging.info(f"Artificially contaminating {sig.description}")
+              signal_array[:,curr_idx:curr_idx + sig.num_channels] = cont_value
+            curr_idx += sig.num_channels
+
+        return self.ttd, signal_array
+
+
+    def get_data_arrays_lmtarget(self, use_signals, dtype='float32',predict_mode='shift_target',predict_time=0,target_description='Locked mode amplitude'):
+        """Mystery function"""
+        def derivative_lm(arr):
+            if len(arr)<3:
+               return arr
+            else:
+               res=[0]
+               for i in range(1,len(arr)):
+                 res.append(arr[i]-arr[i-1])
+               return np.array(res)
+        def derivative_lm_norm(arr):
+            if len(arr)<3:
+               return arr
+            else:
+               res=[0]
+               for i in range(1,len(arr)):
+                 res.append((arr[i]-arr[i-1])/(arr[i-1]+0.01))
+               return np.array(res)
+        def ttelm(arr):
+            if len(arr)<3:
+                return [10,10,10]
+            else:
+                _,tar = find_elm_events_tar(np.arange(0,len(arr)),arr)
+                cutting_time = 100
+                tar[np.argwhere(tar>cutting_time)] = cutting_time
+                tar = tar*0.1
+            return tar
+
+        def smooth_lm(arr,window=50):
+             #print('smooth_lm_arr_shape:',arr.shape,arr[0])
+             window=window//2
+             if len(arr)==0:
+                return []
+             pad=[]
+             for i in range(window):
+                 pad.append(arr[0])
+             pad=np.array(pad)
+             arr_pad=np.concatenate((np.array(pad),arr))
+             arr_pad=np.concatenate((arr_pad,np.array([arr[-1]]*window)))
+             ress=[]
+             for i in range(window,len(arr)+window):
+                ress.append(sum(arr_pad[i-window:i+window])/(window*2))
+             return np.array(ress)
+
+        predict_time=predict_time+1
+        t_array = self.ttd
+        signal_array = np.zeros(
+            (len(t_array), sum([sig.num_channels for sig in use_signals])+2*128),
+            dtype=dtype)
+        curr_idx = 0
+        lm=self.ttd
+        res=[]
+        for sig in self.signals:
+            if sig.description in target_description and len(t_array)>predict_time:
+               #print('TargetDescription:',target_description) 
+               #print(len(t_array),predict_time)
+               lm=self.ttd.copy()
+               lm[:-predict_time]=np.reshape(self.signals_dict[sig][predict_time:],(-1))
+               lm[-predict_time:]=self.signals_dict[sig][-predict_time][0]
+               res.append(lm)
+        #       self.signals_dict[sig]=0.0
+            if sig in use_signals:
+              signal_array[:, curr_idx:curr_idx
+                         + sig.num_channels] = self.signals_dict[sig]
+              curr_idx += sig.num_channels
+              if sig.description == "q profile efitrt1":
+                print(self.number)
+                n_mode,m_mode = get_rational(self.signals_dict[sig],self.number,saving = True)
+                signal_array[:, curr_idx:curr_idx
+                         + sig.num_channels] = n_mode
+                curr_idx += sig.num_channels
+                signal_array[:, curr_idx:curr_idx
+                         + sig.num_channels] = m_mode
+                curr_idx += sig.num_channels
+
+           #   else:
+           #     signal_array[:, curr_idx:curr_idx
+           #              + sig.num_channels] = self.signals_dict[sig]
+
+        if predict_mode=='smooth_target':
+            for i in range(len(res)):
+                res[i]=smooth_lm(res[i],window=50)
+        if predict_mode=='derivative_target':
+            for i in range(len(res)):
+                res[i]=derivative_lm(res[i])
+        if predict_mode=='derivative_target_norm':
+            for i in range(len(res)):
+                res[i]=derivative_lm_norm(res[i])
+        if predict_mode=='ttelm_target':
+            for i in range(len(res)):
+                res[i]=ttelm(res[i])
+        return np.transpose(np.array(res)), signal_array
+
+
+    def _load_signal_data(self, conf):
+        """Load signals and time bases for a given shot.
+
+        This method loads all signal data and time bases from text files.
+        Used keys from conf:
+        conf["paths"]["data"] - ???
+        conf["data"]["floatx"] - Datatype, either float32 or float64
+        conf["paths"]["signal_prepath"] - ???
+
+        Parameters:
+          conf (dict) global configuration
+
+
+        Output:
+          time_arrays: List of time bases for the specified signals
+          signal_arrays: List of ndarrays for the specified signals
+          t_min: Min time of all time bases
+          t_max: Max time in all time bases
+
+        Raises:
+
+            BadShotException: Multiple possibilities
+
+        """
+        t_min = -np.Inf         # Smallest time in all time bases
+        t_max = np.Inf          # Largest time in all time bases
+        # t_thresh = -1
+        signal_arrays = []      # To be populated with a list of ndarrays with shot data
+        tb_arrays = []          # To be populated with a list of ndarrays, containing time bases
+
+        invalid_signals = 0 # Counts the number of invalid signals for this shot
+        signal_prepath = conf['paths']['signal_prepath']
+
+        # Iterate over all signals and extract data
+        for signal in self.signals:
+            # Try loading the signal. When this fails, append dummy data.
+            try:
+                tb, signal = signal.load_data(signal_prepath, self, self.dtype)
+            except SignalCorruptedError as err:
+                # TODO: Why is there a sig[1] in the dimension
+                #signal = np.zeros((tb.shape[0], sig[1]))
+                invalid_signals += 1
+                signal_arrays.append(np.zeros([tb.shape[0], 1]), dtype=self.dtype)
+                tb_arrays.append(np.arange(0, 20, 1e-3, dtype=self.dtype))
+
+            # At this point we assume that we have good data from the shot.
+
+            # Update t_min and append signal and timebase to the working data
+            t_min = max(t_min, tb.min())
+            signal_arrays.append(signal)
+            tb_arrays.append(tb)
+
+            # Handle edge-case where the shot is supposedly disruptive, but the disruption
+            # happens after the signal ends.
+            # In the case where no previously added diagnostic covers the disruption we raise and error
+            # If a previously added diagnostic covers the disruption we add dummy data for this signal
+            if self.is_disruptive and self.t_disrupt > tb.max():
+                t_max_total = (tb.max() + signal.get_data_avail_tolerance(self.machine))
+
+                if (self.t_disrupt > t_max_total):
+                    # The time of the disruption is out of range.
+                    # Instead of the signal we use dummy data.
+                    invalid_signals += 1
+                    tb = np.arange(0, 20.0, 1e-3)
+                    signal = np.zeros((tb.shape[0], signal.shape[1]))
+                    #Setting the entire channel to zero to prevent any peeking into possible disruptions from this early ended channel
+                else:
+                    t_max = tb.max() + signal.get_data_avail_tolerance(self.machine)
+            else:
+                t_max = min(t_max, tb.max())
+
+        # make sure the shot is long enough.
+        dt = conf['data']['dt']
+
+        # Perform sanity checks.
+        # 1/ t_max should be larger than t_min
+        if t_max < t_min:
+            raise BadShotException(f"Shot {self.number} has t_max = {t_max} < t_min = {t_min}. Expected t_max > t_min.")
+# Remove this test so we don't have to pass conf for now
+#        # 2/ The shot timebase should be sufficiently long enough.
+#        if (t_max - t_min)/dt <= (2 * conf['model']['length'] + conf['data']['T_min_warn']):
+#            raise BadShotException(f"Shot {self.number} contains insufficient data, omitting.")
+        # 3/ The shot is marked disruptive and the disruption occurs after all measurements
+        if self.is_disruptive and self.t_disrupt > t_max:
+            raise BadShotException(f"Shot {self.number} is disruptive at {self.t_disrupt}s but data stops at {t_max}")
+
+        if invalid_signals > 2:
+            raise BadShotException(f"Shot {self.number} has more than 2 bad channels.")
+
+        if self.is_disruptive:
+            t_max = self.t_disrupt
+
+        return tb_arrays, signal_arrays, t_min, t_max
+
+
+    def convert_to_ttd(self, tr, conf):
+        T_max = conf['data']['T_max']
+        dt = conf['data']['dt']
+        if self.is_disruptive:
+            ttd = max(tr) - tr
+            ttd = np.clip(ttd, 0, T_max)
+        else:
+            ttd = T_max*np.ones_like(tr)
+        ttd = np.log10(ttd + 1.0*dt/10)
+        return ttd
+
+    def save(self, prepath):
+        makedirs_process_safe(prepath)
+        save_path = self.get_save_path(prepath)
+        np.savez(save_path,  is_disruptive=self.is_disruptive,
+                 signals_dict=self.signals_dict, ttd=self.ttd)
+        print(f"...saved shot {self.number}")
+
+    def get_save_path(self, prepath):
+        return get_individual_shot_file(prepath, self.number, '.npz')
+
+    def restore(self, prepath, light=False):
+        assert self.previously_saved(prepath), 'shot was never saved'
+        save_path = self.get_save_path(prepath)
+        dat = np.load(save_path, encoding="latin1", allow_pickle=True)
+
+        self.is_disruptive = dat['is_disruptive'][()]
+
+        if light:
+            self.signals_dict = None
+            self.ttd = None
+        else:
+            self.signals_dict = dat['signals_dict'][()]
+            self.ttd = dat['ttd']
+
+    def previously_saved(self, prepath):
+        save_path = self.get_save_path(prepath)
+        return os.path.isfile(save_path)
+
+    def make_light(self):
+        """"""
+        self.signals_dict = None
+        self.ttd = None
+
+    def num_timesteps(self, prepath):
+        """Mystery function."""
+        self.restore(prepath)
+        self.make_light()
+        return self.ttd.shape[0]
+
+    def get_id_str(self):
+        return f"{self.machine} : {self.number}"
+
+    def __lt__(self, other):
+        return self.get_id_str().__lt__(other.get_id_str())
+
+    def __eq__(self, other):
+        return self.get_id_str().__eq__(other.get_id_str())
+
+    def __hash__(self):
+        import hashlib
+        return int(
+            hashlib.md5(
+                self.get_id_str().encode('utf-8')).hexdigest(),
+            16)
+
+    def __str__(self):
+        """String representation of the shot"""
+        string = f"""number: {self.number}
+                     machine: {self.machine}
+                     signals: {self.signals}
+                     signals_dict: {signals_dict}
+                     ttd: {self.ttd}
+                     is_disruptive: {self.is_disruptive}
+                     t_disrupt: {self.t_disrupt}"""
+        return string
+
+    def get_number(self):
+        raise DeprecationWarning("Replace shot.get_number() with shot.number")
+
+    def get_signals(self):
+        raise DeprecationWarning("Replace shot.get_signals() with shot.signals")
+
+    def is_disruptive_shot(self):
+        raise DeprecationWarning("Replace shot.is_disruptive_shot() with shot.is_disruptive")
+
+    @staticmethod
+    def is_disruptive_given_disruption_time(t):
+        return t >= 0
 
 
 class ShotListFiles(object):
@@ -83,7 +506,7 @@ class ShotListFiles(object):
 
 
 class ShotList(object):
-    """ 
+    """
     A wrapper class around list of Shot objects, providing utilities to
     extract, load and transform Shots before passing them to an estimator.
 
@@ -110,8 +533,6 @@ class ShotList(object):
 
         Returns:
             nothing
-
-   
         """
 
         print("Called load_from_shot_list_files_object: ", type(shot_list_files_object), shot_list_files_object)
@@ -283,445 +704,8 @@ class ShotList(object):
         for shot in self.shots:
             shot.make_light()
 
-    def append_if_valid(self, shot):
-        if shot.valid:
-            self.append(shot)
-            return True
-        else:
-            # print('Warning: shot {} not valid, omitting'.format(shot.number))
-            return False
-
-
-class Shot(object):
-    """A class representing a shot. 
-
-    A shot represents multiple measurement of plasma properties (current, locked mode
-    amplitude, etc.) as a function of time.
-
-    This class
-    * Contains a dictionary / list of signals within a shot
-    * Exposes data loading functinoality (implemented by calling the signals' getter methods)
-    * Encapsulates pre-processing functionality
-    * Provides a target function
-
-
-    TODO:
-    * When instantiating a shot it usually is empty. Why is there an option to pass signals_dict in the contructor?
-    """
-
-    def __init__(self, number=None, machine=None, signals=None, ttd=None, valid=None,
-                 is_disruptive=None, t_disrupt=None, dtype=np.float32,
-                 weight=1.0, augmentation_fn=None):
-        """Initializes a shot object.
-
-        Arguments
-            number (int)
-                unique identifier of a shot
-            t_disrupt (float)
-                disruption time in milliseconds (second column in the shotlist input file)
-            ttd (ndarray, float)
-                time profile of the shot converted to time-to-disruption values
-            valid (bool)
-                Indicates whether plasma property (specifically, current) reaches a certain value during the shot
-            is_disruptive (bool)
-                Indicates whether a shot is disruptive
-            dtype (np.float32, optional)
-                Numerical type used for floating point numbers
-
-        """
-        self.number = number               # Shot identifier
-        self.machine = machine             # machine on which the shot is defined
-        self.signals = signals             # List of signals available in the shot
-        self.ttd = ttd                     # Timebase of the shot. Approaches zero for disruption
-        self.valid = valid                 # Valid. True if the shot shold be used for training
-        self.is_disruptive = is_disruptive # True if the shot disrupts, false otherwise
-        self.t_disrupt = t_disrupt         # Time of the disruption
-        self.dtype = dtype
-        self.weight = weight
-        self.augmentation_fn = augmentation_fn
-
-        if t_disrupt is not None:
-            self.is_disruptive = Shot.is_disruptive_given_disruption_time(
-                t_disrupt)
-        else:
-            logging.info('Warning, disruption time (disruptivity) not set! ',
-                  'Either set t_disrupt or is_disruptive')
-
-        # The DIII-D shots below 
-        if machine == MachineD3D and self.number in bad_shot_list_d3d:
-            raise BadShotException(f"Shot.__init__(): Shot {self.number} on D3D is not good.")
-
-
-    def num_timesteps(self, prepath):
-        """Mystery function."""
-        self.restore(prepath)
-        self.make_light()
-        return self.ttd.shape[0]
-
-    def get_data_arrays(self, use_signals, cont_signal=None, cont_value=None):
-        """Allocates a numpy array for signals in this shot.
-
-        Allocate a 2d array with dimensions length(time) * sum signal.num_channels.
-
-        If the optional parameter contaminate_signal is equals the description of a 
-        existing signal in self.signals_dict, the values of that signal will be replace with
-        cont_value
-
-        Parameters:
-          use_signals: list(:obj:`plasma.primitives.signals.signal`) List of signals to use for data allocation
-          cont_signal: (string) Description of the signal that will be contaminated
-          cont_value: (float) New value of the contamination signals
-
-
-        Output:
-          t_array: ndarray(float)  Time base array
-          signal_array: ndarray(float)  Array with one signal per column
-        """
-
-        # Pre-allocate numpy array
-        signal_array = np.zeros((len(self.ttd), sum([sig.num_channels for sig in use_signals])), dtype=self.dtype)
-
-        # Deep copy all signal data into the allocated array
-        curr_idx = 0
-        for sig in use_signals:
-            signal_array[:, curr_idx:curr_idx + sig.num_channels] = self.signals_dict[sig]
-            if sig.description == cont_signal:
-              logging.info(f"Artificially contaminating {sig.description}")
-              signal_array[:,curr_idx:curr_idx + sig.num_channels] = cont_value
-            curr_idx += sig.num_channels
-
-        return self.ttd, signal_array
-
-
-    def get_data_arrays_lmtarget(self, use_signals, dtype='float32',predict_mode='shift_target',predict_time=0,target_description='Locked mode amplitude'):
-        """Mystery function"""
-        def derivative_lm(arr):
-            if len(arr)<3:
-               return arr
-            else:
-               res=[0]
-               for i in range(1,len(arr)):
-                 res.append(arr[i]-arr[i-1])
-               return np.array(res)
-        def derivative_lm_norm(arr):
-            if len(arr)<3:
-               return arr
-            else:
-               res=[0]
-               for i in range(1,len(arr)):
-                 res.append((arr[i]-arr[i-1])/(arr[i-1]+0.01))
-               return np.array(res)
-        def ttelm(arr):
-            if len(arr)<3:
-                return [10,10,10]
-            else:
-                _,tar = find_elm_events_tar(np.arange(0,len(arr)),arr)
-                cutting_time = 100
-                tar[np.argwhere(tar>cutting_time)] = cutting_time
-                tar = tar*0.1
-            return tar
-
-        def smooth_lm(arr,window=50):
-             #print('smooth_lm_arr_shape:',arr.shape,arr[0])
-             window=window//2
-             if len(arr)==0:
-                return []
-             pad=[]
-             for i in range(window):
-                 pad.append(arr[0])
-             pad=np.array(pad)
-             arr_pad=np.concatenate((np.array(pad),arr))
-             arr_pad=np.concatenate((arr_pad,np.array([arr[-1]]*window)))
-             ress=[]
-             for i in range(window,len(arr)+window):
-                ress.append(sum(arr_pad[i-window:i+window])/(window*2))
-             return np.array(ress)
-
-        predict_time=predict_time+1
-        t_array = self.ttd
-        signal_array = np.zeros(
-            (len(t_array), sum([sig.num_channels for sig in use_signals])+2*128),
-            dtype=dtype)
-        curr_idx = 0
-        lm=self.ttd
-        res=[]
-        for sig in self.signals:
-            if sig.description in target_description and len(t_array)>predict_time:
-               #print('TargetDescription:',target_description) 
-               #print(len(t_array),predict_time)
-               lm=self.ttd.copy()
-               lm[:-predict_time]=np.reshape(self.signals_dict[sig][predict_time:],(-1))
-               lm[-predict_time:]=self.signals_dict[sig][-predict_time][0]
-               res.append(lm)
-        #       self.signals_dict[sig]=0.0
-            if sig in use_signals:
-              signal_array[:, curr_idx:curr_idx
-                         + sig.num_channels] = self.signals_dict[sig]
-              curr_idx += sig.num_channels
-              if sig.description == "q profile efitrt1":
-                print(self.number)
-                n_mode,m_mode = get_rational(self.signals_dict[sig],self.number,saving = True)
-                signal_array[:, curr_idx:curr_idx
-                         + sig.num_channels] = n_mode
-                curr_idx += sig.num_channels
-                signal_array[:, curr_idx:curr_idx
-                         + sig.num_channels] = m_mode
-                curr_idx += sig.num_channels
-
-           #   else:
-           #     signal_array[:, curr_idx:curr_idx
-           #              + sig.num_channels] = self.signals_dict[sig]
-
-        if predict_mode=='smooth_target':
-            for i in range(len(res)):
-                res[i]=smooth_lm(res[i],window=50)
-        if predict_mode=='derivative_target':
-            for i in range(len(res)):
-                res[i]=derivative_lm(res[i])
-        if predict_mode=='derivative_target_norm':
-            for i in range(len(res)):
-                res[i]=derivative_lm_norm(res[i])
-        if predict_mode=='ttelm_target':
-            for i in range(len(res)):
-                res[i]=ttelm(res[i])
-        return np.transpose(np.array(res)), signal_array
-
-
-    def preprocess(self, conf):
-        logging.info(f"Preprocessing shot {self.number}")
-        # get minmax times
-        time_arrays, signal_arrays, t_min, t_max  = self.load_signal_data(conf)
-        # cut and resample
-        self.cut_and_resample_signals(time_arrays, signal_arrays, t_min, t_max, conf)
-
-        return None
-
-
-    def load_signal_data(self, conf):
-        """Load signals and time bases for a given shot.
-
-        This method loads all signal data and time bases from text files.
-        Used keys from conf:
-        conf["paths"]["data"] - ???
-        conf["data"]["floatx"] - Datatype, either float32 or float64
-        conf["paths"]["signal_prepath"] - ???
-
-        Parameters:
-          conf (dict) global configuration
-
-
-        Output:
-          time_arrays: List of time bases for the specified signals
-          signal_arrays: List of ndarrays for the specified signals
-          t_min: Min time of all time bases
-          t_max: Max time in all time bases
-          valid: True: Good shot. False: Bad shot
-
-        Raises:
-
-            BadShotException: Multiple possibilities
-
-        """
-        t_min = -np.Inf         # Smallest time in all time bases
-        t_max = np.Inf          # Largest time in all time bases
-        # t_thresh = -1
-        signal_arrays = []      # To be populated with a list of ndarrays with shot data
-        tb_arrays = []          # To be populated with a list of ndarrays, containing time bases
-        garbage = False
-        
-        if conf['paths']['data'] =='d3d_data_garbage':
-            garbage=True
-        elif conf['paths']['data'] == 'd3d_data_n1rms_gar' :
-            garbage=True
-
-        invalid_signals = 0 # Counts the number of invalid signals for this shot
-        signal_prepath = conf['paths']['signal_prepath']
-
-        # Iterate over all signals and extract data
-        for signal in self.signals:
-            # In case of a list, handle each signal individually
-            # Possible bug: Iterating over the list would only use the last prepath in `signal_prepath`
-            # if isinstance(signal_prepath, list):
-            #     for prepath in signal_prepath:
-            #         t, sig, valid_signal = signal.load_data(prepath, self, self.dtype)
-            # else:
-            #     t, sig, valid_signal = signal.load_data(signal_prepath, self, self.dtype)
-
-            # Try loading the signal. When this fails, append dummy data.
-            try:
-                tb, signal = signal.load_data(signal_prepath, self, self.dtype)
-            except SignalCorruptedError as err:
-                # TODO: Why is there a sig[1] in the dimension
-                #signal = np.zeros((tb.shape[0], sig[1]))
-                invalid_signals += 1
-                signal_arrays.append(np.zeros([tb.shape[0], 1]))
-                tb_arrays.append(np.arange(0, 20, 1e-3))
-
-            # At this point we assume that we have good data from the shot.
-
-            # Update t_min and append signal and timebase to the working data
-            t_min = max(t_min, tb.min())
-            signal_arrays.append(signal)
-            tb_arrays.append(tb)
-
-            # Handle the edge-case where the shot is supposedly disruptive, but the disruption
-            # happens after the signal ends.
-            # In the case where no previously added diagnostic covers the disruption we raise and error
-            # If a previously added diagnostic covers the disruption we add dummy data for this signal
-            if self.is_disruptive and self.t_disrupt > tb.max():
-                t_max_total = (tb.max() + signal.get_data_avail_tolerance(self.machine))
-
-                if (self.t_disrupt > t_max_total):
-                    if garbage==False:
-                        err_str = f"""Shot {self.number}: disruption event
-                            is not contained in valid time region of
-                            signal {signal} by {self.t_disrupt - tb.max()}s, omitting."""
-                        raise BadShotException(err)
-
-                    else:
-                        invalid_signals += 1
-                        tb = np.arange(0, 20.0, 1e-3)
-                        signal = np.zeros((tb.shape[0], signal.shape[1]))
-                        #Setting the entire channel to zero to prevent any peeking into possible disruptions from this early ended channel
-                else:
-                    t_max = tb.max() + signal.get_data_avail_tolerance(self.machine)
-            else:
-                t_max = min(t_max, tb.max())
-
-        # make sure the shot is long enough.
-        dt = conf['data']['dt']
-
-        # Perform sanity checks.
-        # 1/ t_max should be larger than t_min
-        if t_max < t_min:
-            raise BadShotException(f"Shot {self.number} has t_max = {t_max} < t_min = {t_min}. Expected t_max > t_min.")
-        # 2/ The shot timebase should be sufficiently long enough.
-        if (t_max - t_min)/dt <= (2 * conf['model']['length'] + conf['data']['T_min_warn']):
-            raise BadShotException(f"Shot {self.number} contains insufficient data, omitting.")
-        # 3/ The shot is marked disruptive and the disruption occurs after all measurements
-        if self.is_disruptive and self.t_disrupt > t_max:
-            raise BadShotException(f"Shot {self.number} is disruptive at {self.t_disrupt}s but data stops at {t_max}")
-
-        if invalid_signals > 2:
-            raise BadShotException(f"Shot {self.number} has more than 2 bad channels.")
-
-        if self.is_disruptive:
-            t_max = self.t_disrupt
-
-        return tb_arrays, signal_arrays, t_min, t_max
-
-    def cut_and_resample_signals(
-            self,
-            time_arrays,
-            signal_arrays,
-            t_min,
-            t_max,
-            conf):
-        dt = conf['data']['dt']
-        signals_dict = dict()
-        print('resampling..',self.number)
-        # resample signals
-        assert((len(signal_arrays) == len(time_arrays)
-                == len(self.signals)) and len(signal_arrays) > 0)
-        tr = 0
-        for (i, signal) in enumerate(self.signals):
-            print(signal)
-            tr, sigr = cut_and_resample_signal(
-                time_arrays[i], signal_arrays[i], t_min, t_max, dt,
-                conf['data']['floatx'])
-            signals_dict[signal] = sigr
-
-        ttd = self.convert_to_ttd(tr, conf)
-        self.signals_dict = signals_dict
-        self.ttd = ttd
-
-    def convert_to_ttd(self, tr, conf):
-        T_max = conf['data']['T_max']
-        dt = conf['data']['dt']
-        if self.is_disruptive:
-            ttd = max(tr) - tr
-            ttd = np.clip(ttd, 0, T_max)
-        else:
-            ttd = T_max*np.ones_like(tr)
-        ttd = np.log10(ttd + 1.0*dt/10)
-        return ttd
-
-    def save(self, prepath):
-        makedirs_process_safe(prepath)
-        save_path = self.get_save_path(prepath)
-        np.savez(save_path, valid=self.valid, is_disruptive=self.is_disruptive,
-                 signals_dict=self.signals_dict, ttd=self.ttd)
-        print('...saved shot {}'.format(self.number))
-
-    def get_save_path(self, prepath):
-        return get_individual_shot_file(prepath, self.number, '.npz')
-
-    def restore(self, prepath, light=False):
-        assert self.previously_saved(prepath), 'shot was never saved'
-        save_path = self.get_save_path(prepath)
-        dat = np.load(save_path, encoding="latin1", allow_pickle=True)
-
-        self.valid = dat['valid'][()]
-        self.is_disruptive = dat['is_disruptive'][()]
-
-        if light:
-            self.signals_dict = None
-            self.ttd = None
-        else:
-            self.signals_dict = dat['signals_dict'][()]
-            self.ttd = dat['ttd']
-
-    def previously_saved(self, prepath):
-        save_path = self.get_save_path(prepath)
-        return os.path.isfile(save_path)
-
-    def make_light(self):
-        self.signals_dict = None
-        self.ttd = None
-
-
-    def get_id_str(self):
-        return f"{self.machine} : {self.number}"
-
-    def __lt__(self, other):
-        return self.get_id_str().__lt__(other.get_id_str())
-
-    def __eq__(self, other):
-        return self.get_id_str().__eq__(other.get_id_str())
-
-    def __hash__(self):
-        import hashlib
-        return int(
-            hashlib.md5(
-                self.get_id_str().encode('utf-8')).hexdigest(),
-            16)
-
-    def __str__(self):
-        """String representation of the shot"""
-        string = f"number: {self.number}\n"
-        string += "machine: {self.machine}\n"
-        string += "signals: {self.signals}\n"
-        string += "signals_dict: {signals_dict}\n"
-        string += "ttd: {self.ttd}\n"
-        string += "valid: {self.valid}\n"
-        string += "is_disruptive: {self.is_disruptive}\n"
-        string += "t_disrupt: {self.t_disrupt}\n"
-        return string
-
-    def get_number(self):
-        raise DeprecationWarning("Replace shot.get_number() with shot.number")
-
-    def get_signals(self):
-        raise DeprecationWarning("Replace shot.get_signals() with shot.signals")
-
-    def is_valid(self):
-        raise DeprecationWarning("Replace shot.is_valid() with shot.valid")
-
-    def is_disruptive_shot(self):
-        raise DeprecationWarning("Replace shot.is_disruptive_shot() with shot.is_disruptive")
-
-    @staticmethod
-    def is_disruptive_given_disruption_time(t):
-        return t >= 0
+    def append(self, shot):
+        self.append(shot)
+        return True
 
 # it used to be in utilities, but can't import globals in multiprocessing
