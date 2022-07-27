@@ -11,9 +11,13 @@ Welcome to FRNN's documentation!
    :caption: Contents:
 
    intro
+   guides
+
    primitives
-   
+
    modules
+
+   
 
 
 

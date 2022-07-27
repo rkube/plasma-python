@@ -306,9 +306,7 @@ class Shot(object):
 
 
     TODO:
-    * When instantiating a shot it usually is empty. Why is there an option to pass signals_dict
-      in the contructor?
-
+    * When instantiating a shot it usually is empty. Why is there an option to pass signals_dict in the contructor?
     """
 
     def __init__(self, number=None, machine=None, signals=None, ttd=None, valid=None,

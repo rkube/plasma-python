@@ -28,13 +28,14 @@ setup(name="plasma",
       # TODO(KGF): continue specifying "mininmum reqs" of deps w/o any version
       # info in this file in conjunction with specific reqs in Conda YAML?
       install_requires=[
-          'pathos',
           'matplotlib',
           'hyperopt',
           'mpi4py',
           'xgboost',
           'scikit-learn',
           'joblib',
+          'sphinx',
+          'sphinx-rtd-theme'
           ],
       # TODO(KGF): add optional feature specs for [deephyper,balsam,
       # readthedocs,onnx,keras2onnx]

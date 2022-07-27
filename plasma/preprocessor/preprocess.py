@@ -331,19 +331,19 @@ def guarantee_preprocessed(conf, verbose=False):
     select_shot =True
     ss = list(range(153760,153768))+list(range(170865,170897))+list(range(174819,174853))+[166671]
     if select_shot:
-    for s in shot_list_train:
-            if s.number in ss:
-            print('Found in train',s.number)
-            shot_list_train.remove(s)
-            shot_list_test.append(s)
-    for s in shot_list_validate:
-            if s.number in ss:
-            print('Found in validate',s.number)
-            shot_list_validate.remove(s)
-            shot_list_test.append(s)
-    for s in shot_list_test:
-            if s.number in ss:
-            print('Found in test',s.number)
+        for s in shot_list_train:
+                if s.number in ss:
+                print('Found in train',s.number)
+                shot_list_train.remove(s)
+                shot_list_test.append(s)
+        for s in shot_list_validate:
+                if s.number in ss:
+                print('Found in validate',s.number)
+                shot_list_validate.remove(s)
+                shot_list_test.append(s)
+        for s in shot_list_test:
+                if s.number in ss:
+                print('Found in test',s.number)
     if verbose:
         g.print_unique('validate: {} shots, {} disruptive'.format(
             len(shot_list_validate), shot_list_validate.num_disruptive()))
