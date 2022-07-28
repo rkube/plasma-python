@@ -109,8 +109,9 @@ def cut_signal(t, sig, tmin, tmax):
         t (array, float) : timebase truncated to [tmin:tmax]
         sig (array, float) : signal truncated to [tmin, tmax]
     """
-    mask = np.logical_and(t >= tmin, t <= tmax)
-    return t[mask], sig[mask, :]
+    raise DeprecationWarning("This should not be a separate function...")
+    #mask = np.logical_and(t >= tmin, t <= tmax)
+    #return t[mask], sig[mask, :]
 
 
 # def cut_and_resample_signal(t, sig, tmin, tmax, dt, dtype=np.float32):

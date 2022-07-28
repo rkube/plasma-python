@@ -300,6 +300,7 @@ class Shot(object):
         for signal in self.signals:
             # Try loading the signal. When this fails, append dummy data.
             try:
+                print("self is ", self.machine, ", thresh = ", self.machine.current_threshold)
                 tb, signal = signal.load_data(signal_prepath, self, self.dtype)
             except SignalCorruptedError as err:
                 # TODO: Why is there a sig[1] in the dimension

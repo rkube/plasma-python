@@ -176,6 +176,7 @@ class Signal():
 
         tb = data[:, 0]
         sig = data[:, 1:]
+        print("shot.machne is ", shot.machine, ", threshold = ", shot.machine.current_threshold)
 
         # If desired, restrict the signal to the interval where the current threshold is satisfied.
         if self.is_ip: 
@@ -190,7 +191,7 @@ class Signal():
             
             # add 50 ms to cover possible disruption event
             last_time = tb[last_idx] + 5e-2
-            last_indices = np.where(t > last_time)[0]
+            last_indices = np.where(tb > last_time)[0]
             if len(last_indices) == 0:
                 last_idx = -1
             else:
