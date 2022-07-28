@@ -176,7 +176,6 @@ class Signal():
 
         tb = data[:, 0]
         sig = data[:, 1:]
-        print("shot.machne is ", shot.machine, ", threshold = ", shot.machine.current_threshold)
 
         # If desired, restrict the signal to the interval where the current threshold is satisfied.
         if self.is_ip: 
