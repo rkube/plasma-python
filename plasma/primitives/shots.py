@@ -372,7 +372,7 @@ class Shot(object):
     def save(self, prepath):
         makedirs_process_safe(prepath)
         save_path = self.get_save_path(prepath)
-        np.savez(save_path,  is_disruptive=self.is_disruptive,
+        np.savez(save_path, is_disruptive=self.is_disruptive,
                  signals_dict=self.signals_dict, ttd=self.ttd)
         print(f"...saved shot {self.number}")
 

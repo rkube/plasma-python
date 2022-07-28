@@ -23,22 +23,21 @@ def find_rational(q,number,max_n = 15,saving = False, save_path = '/tigress/FRNN
                      res_m[i,j] = m
                      break
                      flag_found= True
+       # Possible bug: flag_found above is never executed since it comes after the breaks
        if flag_found == True:
             #only record lowest order rational surface
             break
- #  print(q[i,-10:])
- #  print(res_n[i,-10:])
- #  print(res_m[i,-10:])
+
   if saving ==True:
      np.save(save_path+str(number),{'q':q,'n_mode':res_n, 'm_mode':res_m})
   return res_n,res_m
 
-def get_rational(q,number,max_n = 15,saving = True,save_path = '/tigress/FRNN/signal_data_efit/d3d/EFITRT1/rational/'):
-     try: 
-       dic = np.load(save_path+str(number)+'.npy',allow_pickle = True).item()
-       res_n = dic['n_mode']
-       res_m = dic['m_mode']
-       return res_n, res_m
+def get_rational(q,number, max_n = 15, saving = True, save_path = '/tigress/FRNN/signal_data_efit/d3d/EFITRT1/rational/'):
+    try: 
+dic = np.load(f"{save_path}{number}.npy", allow_pickle = True).item()
+res_n = dic['n_mode']
+res_m = dic['m_mode']
+return res_n, res_m
      except:
        print('calculating rational.....')
        n,m = find_rational(q,number,max_n = max_n,save_path = save_path,saving = saving)
